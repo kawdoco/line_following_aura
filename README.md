@@ -17,23 +17,18 @@ GIDEON 1.0 is a line following robot built for the BCI Campus Negombo Line Follo
 
 ## Team
 
-**Brian Fernandez** | Team Leader & Lead Software Developer
+**Brian Fernandez** | Team Leader & Lead Software Developer -
 Responsible for core logic, PID integration, system architecture, and overall development.
 
-**Sanjana & Kawye** | Wireless Connectivity & Communication
-Handle communication between robot and control app, ensuring stable and reliable data transfer.
+**Sanjana & Kawye** | Handles the Connectivity & Communication between robot and control app, ensuring stable and reliable data transfer.
 
-**Diluksha** | PID Performance Logging
-Focuses on PID and system performance analysis.
+**Diluksha** | PID Performance Logging and system performance analysis.
 
-**Dilmi & Uvindu** | Hardware & Electronics
-Responsible for hardware selection and balanced integration.
+**Dilmi & Uvindu** | Responsible for hardware selection and balanced integration.
 
-**Navodya** | Technical Research & Innovation
-Researches technologies and suggests improvements for system optimization.
+**Navodya** | Technical Research & Innovation - Researches technologies and suggests improvements for system optimization.
 
-**Savinda** | Financial & Resource Management
-Manages budget, resources, and component procurement.
+**Savinda** | Financial & Resource Management - Manages budget, resources, and component procurement.
 
 ---
 
