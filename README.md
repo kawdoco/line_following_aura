@@ -55,4 +55,23 @@ Currently under active development and testing.
 
 ---
 
+## Hardware
+
+| Component | Details | Qty |
+|---|---|---|
+| Microcontroller | NodeMCU ESP32 Dev Board Type-C 30-pin | 1 |
+| Motor Driver | TB6612FNG Dual DC Stepper Motor Driver Module | 1 |
+| Motors | N20 540RPM 6VDC Metal Gear Motor 3mm Shaft | 2 |
+| Line Sensors | CNY70 Reflective Optical Sensor | 8 |
+| Wheels | D-hole Rubber Wheel 43x19x3mm | 2 |
+| Castor Wheel | N20 Standard 15mm High Universal Wheel | 1 |
+| Motor Mounts | N20 Gear Motor Mount Bracket | 2 |
+| Buck Converter | Mini 360 DC 2A Step Down | 1 |
+| Buck Module | MP1584 4.5-28V to 0.8V-18V 3A Step Down | 2 |
+| Battery | 7.4V 1500mAh 2S 95C LiPo XT60 Plug | 1 |
+| Display | 0.96 inch 128x64 OLED Blue I2C | 1 |
+| Switch | SPDT Toggle Switch 3-Pin (ON-OFF-ON) | 2 |
+
+---
+
 This README will be actively updated as the project progresses.
