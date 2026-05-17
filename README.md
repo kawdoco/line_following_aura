@@ -74,4 +74,10 @@ Currently under active development and testing.
 
 ---
 
+## GPIO Pin Configuration
+
+![ESP32 Pin Map](assets/GPIOlayout.svg)
+
+---
+
 This README will be actively updated as the project progresses.
