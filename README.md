@@ -79,5 +79,15 @@ Currently under active development and testing.
 ![ESP32 Pin Map](assets/GPIOlayout.svg)
 
 ---
+## ⚙️ Hardware Overview
 
+Power flows from the **7.4V 2S 95C LiPo battery** through two buck converters — the **MP1584** delivers a clean voltage rail for the ESP32 and sensors, and the **Mini 360** handles the motor driver logic separately. Two **SPDT switches** control power to the system.
+
+The **ESP32 DevKit V1** sits at the center of everything. It polls all eight **CNY70 reflective optical sensors**, runs the control algorithm, and fires PWM and direction signals to the **TB6612FNG motor driver**.
+
+The driver translates those low-current signals into the full current needed to spin two **N20 6V 540RPM geared motors** independently, steering the robot purely through the speed difference between the wheels. Each motor is mounted via an **N20 bracket** driving a **43mm rubber wheel**, with a front **15mm caster wheel** keeping the sensor array at a consistent height above the track.
+
+A **0.96" 128x64 OLED display** shows live system state and sensor feedback during tuning.
+
+---
 This README will be actively updated as the project progresses.
