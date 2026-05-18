@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PID Controller</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    h1 { font-size: 20px; }
+    .section { background: white; padding: 15px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type=range] { width: 100%; }
+    .value { font-size: 14px; color: #333; margin-bottom: 10px; }
+    button { padding: 10px 20px; margin: 5px; font-size: 14px; cursor: pointer; }
+    #status { font-size: 13px; color: gray; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>PID Robot Controller</h1>
+  <p id="status">Status: Not Connected</p>
+
+  <div class="section">
+    <button id="connectBtn" onclick="connectBLE()">Connect via Bluetooth</button>
+    <button id="disconnectBtn" onclick="disconnectBLE()" disabled>Disconnect</button>
+  </div>
+
+  <div class="section">
+    <label>P Value: <span id="pVal">1.00</span></label>
+    <input type="range" id="pSlider" min="0" max="5" step="0.01" value="1.00" oninput="updateVal('p')"/>
+
+    <label>I Value: <span id="iVal">0.00</span></label>
+    <input type="range" id="iSlider" min="0" max="1" step="0.001" value="0.00" oninput="updateVal('i')"/>
+
+    <label>D Value: <span id="dVal">0.00</span></label>
+    <input type="range" id="dSlider" min="0" max="3" step="0.01" value="0.00" oninput="updateVal('d')"/>
+  </div>
+
+  <div class="section">
+    <button id="sendBtn" onclick="sendPID()" disabled>Send PID Values</button>
+    <button id="startBtn" onclick="startRobot()" disabled>START ROBOT</button>
+    <button id="stopBtn" onclick="stopRobot()" disabled>STOP ROBOT</button>
+  </div>
+
+  <script>
+    const SERVICE_UUID        = "12345678-1234-1234-1234-123456789abc";
+    const CHAR_P_UUID         = "12345678-1234-1234-1234-123456789001";
+    const CHAR_I_UUID         = "12345678-1234-1234-1234-123456789002";
+    const CHAR_D_UUID         = "12345678-1234-1234-1234-123456789003";
+    const CHAR_START_UUID     = "12345678-1234-1234-1234-123456789004";
+
+    let device, server, service;
+    let charP, charI, charD, charStart;
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = "Status: " + msg;
+    }
+
+    function updateVal(axis) {
+      const val = parseFloat(document.getElementById(axis + "Slider").value).toFixed(axis === 'i' ? 3 : 2);
+      document.getElementById(axis + "Val").textContent = val;
+    }
+
+    async function connectBLE() {
+      try {
+        setStatus("Scanning...");
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }]
+        });
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+        server = await device.gatt.connect();
+        service = await server.getPrimaryService(SERVICE_UUID);
+        charP     = await service.getCharacteristic(CHAR_P_UUID);
+        charI     = await service.getCharacteristic(CHAR_I_UUID);
+        charD     = await service.getCharacteristic(CHAR_D_UUID);
+        charStart = await service.getCharacteristic(CHAR_START_UUID);
+        setStatus("Connected to " + device.name);
+        document.getElementById("connectBtn").disabled = true;
+        document.getElementById("disconnectBtn").disabled = false;
+        document.getElementById("sendBtn").disabled = false;
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = false;
+      } catch (e) {
+        setStatus("Error: " + e.message);
+      }
+    }
+
+    function onDisconnected() {
+      setStatus("Disconnected");
+      document.getElementById("connectBtn").disabled = false;
+      document.getElementById("disconnectBtn").disabled = true;
+      document.getElementById("sendBtn").disabled = true;
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = true;
+    }
+
+    function disconnectBLE() {
+      if (device && device.gatt.connected) device.gatt.disconnect();
+    }
+
+    function floatToBytes(val) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setFloat32(0, val, true);
+      return new Uint8Array(buf);
+    }
+
+    async function sendPID() {
+      try {
+        const p = parseFloat(document.getElementById("pSlider").value);
+        const i = parseFloat(document.getElementById("iSlider").value);
+        const d = parseFloat(document.getElementById("dSlider").value);
+        await charP.writeValue(floatToBytes(p));
+        await charI.writeValue(floatToBytes(i));
+        await charD.writeValue(floatToBytes(d));
+        setStatus("PID values sent");
+      } catch (e) {
+        setStatus("Send error: " + e.message);
+      }
+    }
+
+    async function startRobot() {
+      try {
+        await sendPID();
+        await charStart.writeValue(new Uint8Array([1]));
+        setStatus("Robot started");
+      } catch (e) {
+        setStatus("Start error: " + e.message);
+      }
+    }
+
+    async function stopRobot() {
+      try {
+        await charStart.writeValue(new Uint8Array([0]));
+        setStatus("Robot stopped");
+      } catch (e) {
+        setStatus("Stop error: " + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
