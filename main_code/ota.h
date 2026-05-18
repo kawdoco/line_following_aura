@@ -1,4 +1,6 @@
 #pragma once
 
-void ota_begin();
-void ota_loop();
+#include <WebServer.h>
+
+void ota_begin(WebServer &server);
+void ota_loop(WebServer &server);

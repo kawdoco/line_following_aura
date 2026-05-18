@@ -1,27 +1,30 @@
 #include <WiFi.h>
-#include <ArduinoOTA.h>
+#include <WiFiAP.h>
+#include <WebServer.h>
+#include <ESP2SOTA.h>
 #include "ota.h"
 #include "secrets.h"
 
-void ota_begin()
+void ota_begin(WebServer &server)
 {
-    ArduinoOTA.setHostname(DEVICE_NAME);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID, AP_PASS);
+    delay(1000);
 
-    ArduinoOTA.onStart([]()
-                       { Serial.println("OTA Start"); });
+    IPAddress IP(10, 10, 10, 1);
+    IPAddress NMask(255, 255, 255, 0);
+    WiFi.softAPConfig(IP, IP, NMask);
 
-    ArduinoOTA.onEnd([]()
-                     { Serial.println("OTA End"); });
+    Serial.print("AP IP address: ");
+    Serial.println(WiFi.softAPIP());
 
-    ArduinoOTA.onError([](ota_error_t error)
-                       { Serial.println("OTA Error"); });
-
-    ArduinoOTA.begin();
+    ESP2SOTA.begin(&server);
+    server.begin();
 
     Serial.println("OTA Ready");
 }
 
-void ota_loop()
+void ota_loop(WebServer &server)
 {
-    ArduinoOTA.handle();
+    server.handleClient();
 }
