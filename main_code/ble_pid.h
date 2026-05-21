@@ -6,6 +6,8 @@ extern float ki;
 extern float kd;
 extern bool robotStarted;
 
+void onCalibrateRequest();
+
 void bleSetup();
 void bleLoop();
 
