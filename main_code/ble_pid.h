@@ -5,8 +5,13 @@ extern float kp;
 extern float ki;
 extern float kd;
 extern bool robotStarted;
+extern int baseSpeed;
+extern int maxSpeed;
 
 void onCalibrateRequest();
+void onStartRequest();
+void onStopRequest();
+void onSpeedUpdate(int newBaseSpeed, int newMaxSpeed);
 
 void bleSetup();
 void bleLoop();

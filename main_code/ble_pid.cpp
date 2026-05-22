@@ -11,8 +11,10 @@
 #define CHAR_D_UUID     "12345678-1234-1234-1234-123456789003"
 #define CHAR_START_UUID "12345678-1234-1234-1234-123456789004"
 #define CHAR_CALIBRATE_UUID "12345678-1234-1234-1234-123456789005"
+#define CHAR_BASE_SPEED_UUID "12345678-1234-1234-1234-123456789006"
+#define CHAR_MAX_SPEED_UUID  "12345678-1234-1234-1234-123456789007"
 
-BLECharacteristic *charP, *charI, *charD, *charStart, *charCalibrate;
+BLECharacteristic *charP, *charI, *charD, *charStart, *charCalibrate, *charBaseSpeed, *charMaxSpeed;
 
 bool deviceConnected = false;
 
@@ -21,10 +23,21 @@ float ki = 0.08;
 float kd = 0.12;
 bool robotStarted = false;
 
+int baseSpeed = 45;
+int maxSpeed = 70;
+
 float readFloat(BLECharacteristic *c)
 {
     uint8_t *data = c->getData();
     float val;
+    memcpy(&val, data, 4);
+    return val;
+}
+
+int readInt(BLECharacteristic *c)
+{
+    uint8_t *data = c->getData();
+    int val;
     memcpy(&val, data, 4);
     return val;
 }
@@ -67,6 +80,18 @@ class PIDCallback : public BLECharacteristicCallbacks
             kd = val;
             Serial.printf("D = %.2f\n", kd);
         }
+        else if (uuid == CHAR_BASE_SPEED_UUID)
+        {
+            int speed = readInt(c);
+            onSpeedUpdate(speed, maxSpeed);
+            Serial.printf("Base Speed = %d\n", speed);
+        }
+        else if (uuid == CHAR_MAX_SPEED_UUID)
+        {
+            int speed = readInt(c);
+            onSpeedUpdate(baseSpeed, speed);
+            Serial.printf("Max Speed = %d\n", speed);
+        }
     }
 };
 
@@ -78,11 +103,13 @@ class StartCallback : public BLECharacteristicCallbacks
         if (cmd == 1)
         {
             robotStarted = true;
+            onStartRequest();
             Serial.println(">> START ROBOT");
         }
         else
         {
             robotStarted = false;
+            onStopRequest();
             Serial.println(">> STOP ROBOT");
         }
     }
@@ -119,12 +146,16 @@ void bleSetup()
     charD = mkChar(CHAR_D_UUID);
     charStart = mkChar(CHAR_START_UUID);
     charCalibrate = mkChar(CHAR_CALIBRATE_UUID);
+    charBaseSpeed = mkChar(CHAR_BASE_SPEED_UUID);
+    charMaxSpeed = mkChar(CHAR_MAX_SPEED_UUID);
 
     charP->setCallbacks(new PIDCallback());
     charI->setCallbacks(new PIDCallback());
     charD->setCallbacks(new PIDCallback());
     charStart->setCallbacks(new StartCallback());
     charCalibrate->setCallbacks(new CalibrateCallback());
+    charBaseSpeed->setCallbacks(new PIDCallback());
+    charMaxSpeed->setCallbacks(new PIDCallback());
 
     service->start();
     BLEAdvertising *adv = BLEDevice::getAdvertising();

@@ -173,3 +173,27 @@ void onCalibrateRequest()
     calibrationRequested = true;
     Serial.println("Calibration requested");
 }
+
+void onStartRequest()
+{
+    Serial.print("START. Cal:"); 
+    Serial.println(isCalibrated ? "YES" : "NO");
+    if (isCalibrated && currentState == STATE_IDLE) {
+        Serial.println("STARTING - but need to implement starting state");
+    } else if (!isCalibrated) {
+        Serial.println("Calibrate first!");
+    }
+}
+
+void onStopRequest()
+{
+    setMotorSpeed(0, 0);
+    Serial.println("EMERGENCY STOP");
+}
+
+void onSpeedUpdate(int newBaseSpeed, int newMaxSpeed)
+{
+    baseSpeed = constrain(newBaseSpeed, 20, 100);
+    maxSpeed = constrain(newMaxSpeed, 40, 150);
+    Serial.printf("Speed: Base=%d Max=%d\n", baseSpeed, maxSpeed);
+}
