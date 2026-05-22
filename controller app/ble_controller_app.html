@@ -4,167 +4,379 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PID Controller</title>
+  <title>PID Robot Controller - World Rank</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --green: #00ff41;
+      --green-dim: #00aa2a;
+      --green-dark: #003b0f;
+      --bg: #0a0a0a;
+      --panel: #0d0d0d;
+      --border: #00ff4133;
+      --red: #ff2222;
+      --yellow: #ffaa00;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: sans-serif;
-      padding: 20px;
-      background: #f0f0f0;
+      font-family: 'Share Tech Mono', monospace;
+      background: var(--bg);
+      color: var(--green);
+      min-height: 100vh;
+      padding: 16px;
+      font-size: 13px;
     }
 
-    h1 {
-      font-size: 20px;
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
+      pointer-events: none;
+      z-index: 999;
     }
 
-    .section {
-      background: white;
-      padding: 15px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
     }
 
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
+    header h1 {
+      font-size: 17px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--green);
+      text-shadow: 0 0 10px var(--green);
+    }
+
+    header p {
+      color: var(--green-dim);
+      font-size: 11px;
+      margin-top: 3px;
+    }
+
+    #statusBar {
+      font-size: 11px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      margin-bottom: 12px;
+    }
+
+    #statusBar span {
+      color: var(--green);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--green-dim);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+    }
+
+    .pid-row {
+      margin-bottom: 12px;
+    }
+
+    .pid-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .pid-label span:last-child {
+      color: var(--green);
+      text-shadow: 0 0 6px var(--green);
     }
 
     input[type=range] {
+      -webkit-appearance: none;
       width: 100%;
+      height: 3px;
+      background: var(--green-dark);
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      cursor: pointer;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     button {
-      padding: 10px 20px;
-      margin: 5px;
-      font-size: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
       cursor: pointer;
+      transition: all 0.15s;
     }
 
-    #status {
+    button:hover:not(:disabled) {
+      background: var(--green);
+      color: #000;
+      box-shadow: 0 0 12px var(--green);
+    }
+
+    button:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
+    #startBtn {
+      border-color: var(--green);
       font-size: 13px;
-      color: gray;
-      margin-top: 10px;
+      padding: 12px 24px;
+      letter-spacing: 4px;
     }
 
-    input[type=text] {
-      padding: 6px;
-      font-size: 14px;
-      width: 200px;
-      margin-right: 5px;
+    #stopBtn {
+      border-color: var(--red);
+      color: var(--red);
     }
 
-    select {
-      padding: 6px;
-      font-size: 14px;
-      width: 220px;
-      margin-right: 5px;
-    }
-
-    .star-row {
-      display: flex;
-      gap: 5px;
-      margin: 10px 0 4px 0;
+    #calibrateBtn {
+      border-color: var(--yellow);
+      color: var(--yellow);
     }
 
     .star {
-      font-size: 22px;
+      font-size: 20px;
       cursor: pointer;
-      color: #ccc;
+      color: #1a3a1a;
+      transition: all 0.1s;
     }
 
     .star.active {
-      color: gold;
-    }
-
-    .star-label {
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 6px;
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
-      margin-top: 10px;
-    }
-
-    th,
-    td {
-      border: 1px solid #ccc;
-      padding: 6px 8px;
-      text-align: left;
+      font-size: 11px;
     }
 
     th {
-      background: #eee;
+      color: var(--green-dim);
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
     }
 
+    td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #0d1f0d;
+      color: #00cc33;
+    }
+
+    .blink {
+      animation: blink 1.2s step-start infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .danger {
+      border-color: var(--red) !important;
+      color: var(--red) !important;
+    }
+
+    .two-col {
+      display: flex;
+      gap: 8px;
+    }
+
+    .two-col>* {
+      flex: 1;
+    }
+
+    input[type=text],
+    select,
     textarea {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      background: #000;
+      border: 1px solid var(--border);
+      color: var(--green);
+      padding: 7px 10px;
+      outline: none;
       width: 100%;
-      font-size: 13px;
-      padding: 6px;
+      margin-bottom: 8px;
+    }
+
+    .log-table-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .star-row {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .export-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .no-logs {
+      color: var(--green-dim);
+      font-size: 11px;
+      letter-spacing: 1px;
+      padding: 10px 0;
     }
   </style>
 </head>
 
 <body>
 
-  <h1>PID Robot Controller</h1>
-  <p id="status">Status: Not Connected</p>
+  <header>
+    <h1>// GIDION CONTROLLER</h1>
+    <p>Robot PID Controller</p>
+  </header>
 
-
-  <div class="section">
-    <button id="connectBtn" onclick="connectBLE()">Connect via Bluetooth</button>
-    <button id="disconnectBtn" onclick="disconnectBLE()" disabled>Disconnect</button>
+  <div id="statusBar">
+    SYS &gt; <span id="statusText">AWAITING CONNECTION<span class="blink">_</span></span>
   </div>
 
-
-  <div class="section">
-    <label>P Value: <span id="pVal">1.00</span></label>
-    <input type="range" id="pSlider" min="0" max="5" step="0.01" value="1.00" oninput="updateVal('p')" />
-    <label>I Value: <span id="iVal">0.000</span></label>
-    <input type="range" id="iSlider" min="0" max="1" step="0.001" value="0.000" oninput="updateVal('i')" />
-    <label>D Value: <span id="dVal">0.00</span></label>
-    <input type="range" id="dSlider" min="0" max="3" step="0.01" value="0.00" oninput="updateVal('d')" />
-    <div class="star-label">Rate this run (click to auto-log):</div>
-    <div class="star-row" id="starRow">
-      <span class="star" onclick="setRatingAndLog(1)">★</span>
-      <span class="star" onclick="setRatingAndLog(2)">★</span>
-      <span class="star" onclick="setRatingAndLog(3)">★</span>
-      <span class="star" onclick="setRatingAndLog(4)">★</span>
-      <span class="star" onclick="setRatingAndLog(5)">★</span>
+  <div class="panel">
+    <div class="panel-title">// BLE CONNECTION</div>
+    <div class="btn-row">
+      <button id="connectBtn" onclick="connectBLE()">&gt; CONNECT</button>
+      <button id="disconnectBtn" onclick="disconnectBLE()" disabled>&gt; DISCONNECT</button>
     </div>
   </div>
 
-
-  <div class="section">
-    <button id="sendBtn" onclick="sendPID()" disabled>Send PID Values</button>
-    <button id="startBtn" onclick="startRobot()" disabled>START ROBOT</button>
-    <button id="stopBtn" onclick="stopRobot()" disabled>STOP ROBOT</button>
+  <div class="panel">
+    <div class="panel-title">// CALIBRATION</div>
+    <div class="btn-row">
+      <button id="calibrateBtn" onclick="calibrateRobot()" disabled style="border-color:#ffaa00; color:#ffaa00;">&gt;
+        CALIBRATE SENSORS</button>
+    </div>
+    <p style="font-size:10px; margin-top:8px; color:var(--green-dim);">Robot is learning black/white levels. Wait for
+      "CALIBRATION COMPLETE"</p>
   </div>
 
-
-  <div class="section">
-    <h3 style="margin-top:0">Presets</h3>
-    <input type="text" id="presetName" placeholder="Preset name e.g. sharp turns" />
-    <button onclick="savePreset()">Save Preset</button>
-    <br><br>
-    <select id="presetList">
-      <option value="">-- Load a preset --</option>
-    </select>
-    <button onclick="loadPreset()">Load</button>
-    <button onclick="deletePreset()">Delete</button>
+  <div class="panel">
+    <div class="panel-title">// PID PARAMETERS</div>
+    <div class="pid-row">
+      <div class="pid-label"><span>P — PROPORTIONAL</span><span id="pVal">0.35</span></div>
+      <input type="range" id="pSlider" min="0" max="50" step="0.01" value="0.35" oninput="updateVal('p')" />
+    </div>
+    <div class="pid-row">
+      <div class="pid-label"><span>I — INTEGRAL</span><span id="iVal">0.000</span></div>
+      <input type="range" id="iSlider" min="0" max="0.5" step="0.001" value="0.000" oninput="updateVal('i')" />
+    </div>
+    <div class="pid-row">
+      <div class="pid-label"><span>D — DERIVATIVE</span><span id="dVal">0.12</span></div>
+      <input type="range" id="dSlider" min="0" max="50" step="0.01" value="0.12" oninput="updateVal('d')" />
+    </div>
+    <div class="btn-row"><button id="sendBtn" onclick="sendPID()" disabled>&gt; SEND VALUES</button></div>
   </div>
 
+  <div class="panel">
+    <div class="panel-title">// MOTOR SPEEDS</div>
+    <div class="pid-row">
+      <div class="pid-label"><span>BASE SPEED (following)</span><span id="baseSpeedVal">45</span></div>
+      <input type="range" id="baseSpeedSlider" min="20" max="100" step="1" value="45" oninput="updateBaseSpeed()" />
+    </div>
+    <div class="pid-row">
+      <div class="pid-label"><span>MAX SPEED (limit)</span><span id="maxSpeedVal">70</span></div>
+      <input type="range" id="maxSpeedSlider" min="40" max="150" step="1" value="70" oninput="updateMaxSpeed()" />
+    </div>
+    <div class="btn-row"><button id="sendSpeedBtn" onclick="sendSpeed()" disabled>&gt; SEND SPEEDS</button></div>
+  </div>
 
-  <div class="section">
-    <h3 style="margin-top:0">Test Log History</h3>
-    <button onclick="exportTXT()">Export as TXT</button>
-    <button onclick="exportMD()">Export as Markdown</button>
-    <button onclick="clearLogs()" style="color:red;">Clear All Logs</button>
-    <div id="logTable" style="margin-top:10px;"></div>
+  <div class="panel">
+    <div class="panel-title">// RACE CONTROL</div>
+    <div class="btn-row">
+      <button id="startBtn" onclick="startRobot()" disabled>&gt; START RACE</button>
+      <button id="stopBtn" onclick="stopRobot()" disabled>&gt; STOP</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">// PRESETS</div>
+    <input type="text" id="presetName" placeholder="preset name e.g. sharp_turns" />
+    <button onclick="savePreset()" style="margin-bottom:8px;">&gt; SAVE PRESET</button>
+    <div class="two-col">
+      <select id="presetList">
+        <option value="">-- select preset --</option>
+      </select>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button onclick="loadPreset()">&gt; LOAD</button>
+      <button class="danger" onclick="deletePreset()">&gt; DELETE</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">// LOG TEST RUN</div>
+    <p style="color:var(--green-dim); font-size:11px; margin-bottom:8px;">RATE THIS RUN THEN COMMIT TO LOG</p>
+    <div class="star-row" id="starRow">
+      <span class="star" onclick="setRating(1)">★</span>
+      <span class="star" onclick="setRating(2)">★</span>
+      <span class="star" onclick="setRating(3)">★</span>
+      <span class="star" onclick="setRating(4)">★</span>
+      <span class="star" onclick="setRating(5)">★</span>
+    </div>
+    <textarea id="noteInput" rows="2" placeholder="notes: e.g. slight oscillation on sharp curve"></textarea>
+    <button onclick="logRun()">&gt; COMMIT TO LOG</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">// TEST LOG HISTORY</div>
+    <div class="export-row">
+      <button onclick="exportTXT()">&gt; EXPORT .TXT</button>
+      <button onclick="exportMD()">&gt; EXPORT .MD</button>
+      <button class="danger" onclick="clearLogs()">&gt; CLEAR LOGS</button>
+    </div>
+    <div class="log-table-wrap" id="logTable"></div>
   </div>
 
   <script>
@@ -173,20 +385,45 @@
     const CHAR_I_UUID = "12345678-1234-1234-1234-123456789002";
     const CHAR_D_UUID = "12345678-1234-1234-1234-123456789003";
     const CHAR_START_UUID = "12345678-1234-1234-1234-123456789004";
+    const CHAR_CALIBRATE_UUID = "12345678-1234-1234-1234-123456789005";
+    const CHAR_BASE_SPEED_UUID = "12345678-1234-1234-1234-123456789006";
+    const CHAR_MAX_SPEED_UUID = "12345678-1234-1234-1234-123456789007";
 
-    let device, server, service, charP, charI, charD, charStart;
+    let device, server, service, charP, charI, charD, charStart, charCalibrate, charBaseSpeed, charMaxSpeed;
+    let currentRating = 0;
 
-    function setStatus(msg) { document.getElementById("status").textContent = "Status: " + msg; }
+    function setStatus(msg) { document.getElementById("statusText").innerHTML = msg + '<span class="blink">_</span>'; }
 
     function updateVal(axis) {
-      const dec = axis === 'i' ? 3 : 2;
-      const val = parseFloat(document.getElementById(axis + "Slider").value).toFixed(dec);
-      document.getElementById(axis + "Val").textContent = val;
+      const val = parseFloat(document.getElementById(axis + "Slider").value);
+      document.getElementById(axis + "Val").textContent = axis === 'i' ? val.toFixed(3) : val.toFixed(2);
+    }
+
+    function updateBaseSpeed() {
+      const val = document.getElementById("baseSpeedSlider").value;
+      document.getElementById("baseSpeedVal").textContent = val;
+    }
+
+    function updateMaxSpeed() {
+      const val = document.getElementById("maxSpeedSlider").value;
+      document.getElementById("maxSpeedVal").textContent = val;
+    }
+
+    function floatToBytes(val) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setFloat32(0, val, true);
+      return new Uint8Array(buf);
+    }
+
+    function intToBytes(val) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setInt32(0, val, true);
+      return new Uint8Array(buf);
     }
 
     async function connectBLE() {
       try {
-        setStatus("Scanning...");
+        setStatus("SCANNING FOR DEVICE...");
         device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
         device.addEventListener('gattserverdisconnected', onDisconnected);
         server = await device.gatt.connect();
@@ -195,24 +432,23 @@
         charI = await service.getCharacteristic(CHAR_I_UUID);
         charD = await service.getCharacteristic(CHAR_D_UUID);
         charStart = await service.getCharacteristic(CHAR_START_UUID);
-        setStatus("Connected to " + device.name);
-        ["connectBtn"].forEach(id => document.getElementById(id).disabled = true);
-        ["disconnectBtn", "sendBtn", "startBtn", "stopBtn"].forEach(id => document.getElementById(id).disabled = false);
-      } catch (e) { setStatus("Error: " + e.message); }
+        charCalibrate = await service.getCharacteristic(CHAR_CALIBRATE_UUID);
+        charBaseSpeed = await service.getCharacteristic(CHAR_BASE_SPEED_UUID);
+        charMaxSpeed = await service.getCharacteristic(CHAR_MAX_SPEED_UUID);
+        setStatus("LINK ESTABLISHED — " + device.name.toUpperCase());
+        document.getElementById("connectBtn").disabled = true;
+        ["disconnectBtn", "sendBtn", "startBtn", "stopBtn", "calibrateBtn", "sendSpeedBtn"].forEach(id => document.getElementById(id).disabled = false);
+      } catch (e) { setStatus("ERROR: " + e.message.toUpperCase()); }
     }
 
     function onDisconnected() {
-      setStatus("Disconnected");
+      setStatus("CONNECTION LOST");
       document.getElementById("connectBtn").disabled = false;
-      ["disconnectBtn", "sendBtn", "startBtn", "stopBtn"].forEach(id => document.getElementById(id).disabled = true);
+      ["disconnectBtn", "sendBtn", "startBtn", "stopBtn", "calibrateBtn", "sendSpeedBtn"].forEach(id => document.getElementById(id).disabled = true);
     }
 
-    function disconnectBLE() { if (device && device.gatt.connected) device.gatt.disconnect(); }
-
-    function floatToBytes(val) {
-      const buf = new ArrayBuffer(4);
-      new DataView(buf).setFloat32(0, val, true);
-      return new Uint8Array(buf);
+    function disconnectBLE() {
+      if (device && device.gatt.connected) device.gatt.disconnect();
     }
 
     async function sendPID() {
@@ -220,21 +456,41 @@
         await charP.writeValue(floatToBytes(parseFloat(document.getElementById("pSlider").value)));
         await charI.writeValue(floatToBytes(parseFloat(document.getElementById("iSlider").value)));
         await charD.writeValue(floatToBytes(parseFloat(document.getElementById("dSlider").value)));
-        setStatus("PID values sent");
-      } catch (e) { setStatus("Send error: " + e.message); }
+        setStatus("PID VALUES TRANSMITTED");
+      } catch (e) { setStatus("TX ERROR: " + e.message.toUpperCase()); }
+    }
+
+    async function sendSpeed() {
+      try {
+        await charBaseSpeed.writeValue(intToBytes(parseInt(document.getElementById("baseSpeedSlider").value)));
+        await charMaxSpeed.writeValue(intToBytes(parseInt(document.getElementById("maxSpeedSlider").value)));
+        setStatus("SPEEDS TRANSMITTED");
+      } catch (e) { setStatus("SPEED ERROR: " + e.message.toUpperCase()); }
+    }
+
+    async function calibrateRobot() {
+      try {
+        await charCalibrate.writeValue(new Uint8Array([1]));
+        setStatus("CALIBRATION STARTED — Robot will move");
+      } catch (e) { setStatus("CALIBRATE ERROR: " + e.message.toUpperCase()); }
     }
 
     async function startRobot() {
-      try { await sendPID(); await charStart.writeValue(new Uint8Array([1])); setStatus("Robot started"); }
-      catch (e) { setStatus("Start error: " + e.message); }
+      try {
+        await sendPID();
+        await sendSpeed();
+        await charStart.writeValue(new Uint8Array([1]));
+        setStatus("RACE STARTED — Place on black square!");
+      } catch (e) { setStatus("START ERROR: " + e.message.toUpperCase()); }
     }
 
     async function stopRobot() {
-      try { await charStart.writeValue(new Uint8Array([0])); setStatus("Robot stopped"); }
-      catch (e) { setStatus("Stop error: " + e.message); }
+      try {
+        await charStart.writeValue(new Uint8Array([0]));
+        setStatus("ROBOT STOPPED");
+      } catch (e) { setStatus("STOP ERROR: " + e.message.toUpperCase()); }
     }
 
-    //PRESETS
     function getPresets() { return JSON.parse(localStorage.getItem("pid_presets") || "{}"); }
     function savePresets(p) { localStorage.setItem("pid_presets", JSON.stringify(p)); }
 
@@ -245,12 +501,14 @@
       presets[name] = {
         p: document.getElementById("pSlider").value,
         i: document.getElementById("iSlider").value,
-        d: document.getElementById("dSlider").value
+        d: document.getElementById("dSlider").value,
+        base: document.getElementById("baseSpeedSlider").value,
+        max: document.getElementById("maxSpeedSlider").value
       };
       savePresets(presets);
       refreshPresetList();
       document.getElementById("presetName").value = "";
-      setStatus("Preset saved: " + name);
+      setStatus("PRESET SAVED: " + name.toUpperCase());
     }
 
     function loadPreset() {
@@ -261,23 +519,26 @@
       document.getElementById("pSlider").value = preset.p; updateVal('p');
       document.getElementById("iSlider").value = preset.i; updateVal('i');
       document.getElementById("dSlider").value = preset.d; updateVal('d');
-      setStatus("Preset loaded: " + name);
+      document.getElementById("baseSpeedSlider").value = preset.base; updateBaseSpeed();
+      document.getElementById("maxSpeedSlider").value = preset.max; updateMaxSpeed();
+      setStatus("PRESET LOADED: " + name.toUpperCase());
     }
 
     function deletePreset() {
       const name = document.getElementById("presetList").value;
       if (!name) return;
+      if (!confirm("Delete preset: " + name + "?")) return;
       const presets = getPresets();
       delete presets[name];
       savePresets(presets);
       refreshPresetList();
-      setStatus("Preset deleted: " + name);
+      setStatus("PRESET DELETED");
     }
 
     function refreshPresetList() {
       const sel = document.getElementById("presetList");
       const presets = getPresets();
-      sel.innerHTML = '<option value="">-- Load a preset --</option>';
+      sel.innerHTML = '<option value="">-- select preset --</option>';
       Object.keys(presets).forEach(name => {
         const opt = document.createElement("option");
         opt.value = name; opt.textContent = name;
@@ -285,71 +546,67 @@
       });
     }
 
-    //LOGGING
+    function setRating(n) {
+      currentRating = n;
+      document.querySelectorAll(".star").forEach((s, i) => s.classList.toggle("active", i < n));
+    }
+
     function getLogs() { return JSON.parse(localStorage.getItem("pid_logs") || "[]"); }
     function saveLogs(l) { localStorage.setItem("pid_logs", JSON.stringify(l)); }
 
-    function setRatingAndLog(n) {
-      document.querySelectorAll(".star").forEach((s, i) => {
-        s.classList.toggle("active", i < n);
-      });
+    function logRun() {
       const p = parseFloat(document.getElementById("pSlider").value).toFixed(2);
       const i = parseFloat(document.getElementById("iSlider").value).toFixed(3);
       const d = parseFloat(document.getElementById("dSlider").value).toFixed(2);
-      const datetime = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const base = document.getElementById("baseSpeedSlider").value;
+      const max = document.getElementById("maxSpeedSlider").value;
+      const notes = document.getElementById("noteInput").value.trim() || "-";
+      const rating = currentRating || 0;
+      const now = new Date();
+      const datetime = now.toISOString().slice(0, 16).replace("T", " ");
       const logs = getLogs();
-      logs.push({ datetime, p, i, d, rating: n });
+      logs.push({ datetime, p, i, d, base, max, rating, notes });
       saveLogs(logs);
       renderLogs();
-      setStatus("Run logged (" + "★".repeat(n) + ") at " + datetime);
-      setTimeout(() => document.querySelectorAll(".star").forEach(s => s.classList.remove("active")), 800);
+      document.getElementById("noteInput").value = "";
+      setRating(0);
+      setStatus("RUN COMMITTED TO LOG — " + datetime);
     }
 
     function renderLogs() {
       const logs = getLogs();
-      if (logs.length === 0) {
-        document.getElementById("logTable").innerHTML = "<p style='color:gray;font-size:13px;'>No logs yet.</p>";
+      if (!logs.length) {
+        document.getElementById("logTable").innerHTML = '<p class="no-logs">&gt; NO ENTRIES FOUND</p>';
         return;
       }
-      let html = "<table><tr><th>Date/Time</th><th>P</th><th>I</th><th>D</th><th>Rating</th></tr>";
+      let html = '<tr><thead><tr><th>DATETIME</th><th>P</th><th>I</th><th>D</th><th>BASE</th><th>MAX</th><th>RATING</th><th>NOTES</th></tr></thead><tbody>';
       [...logs].reverse().forEach(e => {
         const stars = "★".repeat(e.rating) + "☆".repeat(5 - e.rating);
-        html += `<tr><td>${e.datetime}</td><td>${e.p}</td><td>${e.i}</td><td>${e.d}</td><td>${stars}</td></tr>`;
+        html += `<tr><td>${e.datetime}</td><td>${e.p}</td><td>${e.i}</td><td>${e.d}</td><td>${e.base}</td><td>${e.max}</td><td>${stars}</td><td>${e.notes}</td></tr>`;
       });
-      html += "</table>";
+      html += '</tbody></table>';
       document.getElementById("logTable").innerHTML = html;
     }
 
     function clearLogs() {
-      if (confirm("Clear all logs?")) { localStorage.removeItem("pid_logs"); renderLogs(); }
+      if (confirm("Wipe all log entries?")) { localStorage.removeItem("pid_logs"); renderLogs(); setStatus("LOGS CLEARED"); }
     }
 
     function downloadFile(filename, content) {
       const a = document.createElement("a");
       a.href = "data:text/plain;charset=utf-8," + encodeURIComponent(content);
-      a.download = filename;
-      a.click();
+      a.download = filename; a.click();
     }
 
     function exportTXT() {
       const logs = getLogs();
       if (!logs.length) return alert("No logs to export");
       const now = new Date().toISOString().slice(0, 16).replace("T", " ");
-      let out = "================================================\n";
-      out += "  PID TUNING LOG — EXPORTED " + now + "\n";
-      out += "================================================\n\n";
+      let out = "================================================\nPID TUNING LOG — EXPORTED " + now + "\n================================================\n\n";
       logs.forEach((e, idx) => {
         const stars = "★".repeat(e.rating) + "☆".repeat(5 - e.rating);
-        out += `[SESSION ${idx + 1}]\n`;
-        out += `Date/Time  : ${e.datetime}\n`;
-        out += `P          : ${e.p}\n`;
-        out += `I          : ${e.i}\n`;
-        out += `D          : ${e.d}\n`;
-        out += `Rating     : ${stars}\n\n`;
+        out += `[SESSION ${idx + 1}]\nDate/Time: ${e.datetime}\nP: ${e.p}\nI: ${e.i}\nD: ${e.d}\nBase Speed: ${e.base}\nMax Speed: ${e.max}\nRating: ${stars}\nNotes: ${e.notes}\n\n`;
       });
-      out += "================================================\n";
-      out += `  TOTAL SESSIONS LOGGED: ${logs.length}\n`;
-      out += "================================================\n";
       downloadFile("pid_log_" + now.replace(/[ :]/g, "-") + ".txt", out);
     }
 
@@ -357,21 +614,22 @@
       const logs = getLogs();
       if (!logs.length) return alert("No logs to export");
       const now = new Date().toISOString().slice(0, 16).replace("T", " ");
-      let out = "# PID Tuning Log\n\n";
-      out += `_Exported: ${now}_\n\n`;
-      out += "| Date/Time | P | I | D | Rating |\n";
-      out += "|-----------|---|---|---|--------|\n";
+      let out = "# PID Tuning Log\n\n_Exported: " + now + "_\n\n| Date/Time | P | I | D | Base | Max | Rating | Notes |\n|-----------|---|---|---|------|-----|--------|-------|\n";
       logs.forEach(e => {
         const stars = "★".repeat(e.rating) + "☆".repeat(5 - e.rating);
-        out += `| ${e.datetime} | ${e.p} | ${e.i} | ${e.d} | ${stars} |\n`;
+        out += `| ${e.datetime} | ${e.p} | ${e.i} | ${e.d} | ${e.base} | ${e.max} | ${stars} | ${e.notes} |\n`;
       });
       out += `\n_Total sessions: ${logs.length}_\n`;
       downloadFile("pid_log_" + now.replace(/[ :]/g, "-") + ".md", out);
     }
 
-    // init
     refreshPresetList();
     renderLogs();
+    updateVal('p');
+    updateVal('i');
+    updateVal('d');
+    updateBaseSpeed();
+    updateMaxSpeed();
   </script>
 </body>
 
