@@ -39,10 +39,15 @@ int bufferIndex = 0;
 enum RobotState {
     STATE_IDLE,
     STATE_CALIBRATING,
-    STATE_FOLLOWING
+    STATE_STARTING,
+    STATE_FOLLOWING,
+    STATE_INTERSECTION,
+    STATE_STOPPING
 };
 
 RobotState currentState = STATE_IDLE;
+unsigned long stateStartTime = 0;
+unsigned long allBlackStartTime = 0;
 
 WebServer server(80);
 
@@ -50,8 +55,11 @@ WebServer server(80);
 void readSensors();
 void autoCalibrate();
 float computePosition();
+int getLineWidth();
 void updateMotorControl(float position);
 void setMotorSpeed(int leftSpeed, int rightSpeed);
+bool isAllBlack();
+float getLineCurvature();
 void resetPID();
 void emergencyStop();
 
@@ -83,7 +91,7 @@ void setup()
     delay(500);
     digitalWrite(2, LOW);
     
-    Serial.println("Robot ready - line following enabled");
+    Serial.println("Robot ready - with start and intersection handling");
     Serial.println("Press CALIBRATE in app first!");
 }
 
@@ -163,6 +171,7 @@ void autoCalibrate()
     isCalibrated = true;
     digitalWrite(2, LOW);
     Serial.println("Ready! Press START to begin race.");
+    Serial.println("Place robot on ALL BLACK start square first!");
 }
 
 // ========== SENSOR READING ==========
@@ -174,6 +183,17 @@ void readSensors()
         calibrated = constrain(calibrated, 0, 1000);
         calibratedValues[i] = calibrated;
     }
+}
+
+int getLineWidth()
+{
+    int width = 0;
+    int threshold = 200;
+
+    for (int i = 0; i < NUM_SENSORS; i++) {
+        if (calibratedValues[i] > threshold) width++;
+    }
+    return width;
 }
 
 // ========== POSITION CALCULATION ==========
@@ -205,6 +225,32 @@ float computePosition()
     return filteredPos;
 }
 
+// ========== CONDITION DETECTION ==========
+bool isAllBlack()
+{
+    int blackCount = 0;
+    int threshold = 350;
+
+    for (int i = 0; i < NUM_SENSORS; i++) {
+        if (calibratedValues[i] > threshold) blackCount++;
+    }
+    return (blackCount >= 4);
+}
+
+float getLineCurvature()
+{
+    int leftSum = 0, rightSum = 0;
+    int threshold = 250;
+
+    for (int i = 0; i < 3; i++) {
+        if (calibratedValues[i] > threshold) leftSum += calibratedValues[i];
+    }
+    for (int i = 5; i < 8; i++) {
+        if (calibratedValues[i] > threshold) rightSum += calibratedValues[i];
+    }
+    return (float)(rightSum - leftSum) / 100.0;
+}
+
 void resetPID()
 {
     integral = 0;
@@ -216,7 +262,21 @@ void resetPID()
 void updateMotorControl(float position)
 {
     float error = 3.5 - position;
-    
+
+    float deviation = abs(error);
+    int dynamicBaseSpeed = baseSpeed + 20 - (deviation * 12);
+    dynamicBaseSpeed = constrain(dynamicBaseSpeed, 30, maxSpeed);
+
+    int lineWidth = getLineWidth();
+    float widthFactor = 1.0;
+    if (lineWidth >= 3) widthFactor = 0.9;
+    else if (lineWidth <= 1) widthFactor = 1.2;
+
+    float curvature = getLineCurvature();
+    float curvatureFactor = 1.0 + (abs(curvature) / 500.0);
+
+    error = error * curvatureFactor * widthFactor;
+
     integral += error;
     derivative = error - lastError;
     integral = constrain(integral, -200, 200);
@@ -224,8 +284,8 @@ void updateMotorControl(float position)
     pidError = (kp * error) + (ki * integral) + (kd * derivative);
     lastError = error;
 
-    int leftSpeed = baseSpeed - pidError;
-    int rightSpeed = baseSpeed + pidError;
+    int leftSpeed = dynamicBaseSpeed - pidError;
+    int rightSpeed = dynamicBaseSpeed + pidError;
 
     leftSpeed = constrain(leftSpeed, -maxSpeed, maxSpeed);
     rightSpeed = constrain(rightSpeed, -maxSpeed, maxSpeed);
@@ -268,6 +328,7 @@ void emergencyStop()
     setMotorSpeed(0, 0);
     currentState = STATE_IDLE;
     resetPID();
+    allBlackStartTime = 0;
     digitalWrite(2, LOW);
     Serial.println("!!! EMERGENCY STOP ACTIVATED !!!");
 }
@@ -291,11 +352,101 @@ void handleCalibrating()
     calibrationRequested = false;
 }
 
+void handleStarting()
+{
+    readSensors();
+
+    static unsigned long lastDebug = 0;
+    if (millis() - lastDebug > 500) {
+        int blackCount = 0;
+        for (int i = 0; i < NUM_SENSORS; i++) {
+            if (calibratedValues[i] > 400) blackCount++;
+        }
+        Serial.print("Start mode - Black sensors: ");
+        Serial.print(blackCount);
+        Serial.print("/8 | Left edge: ");
+        Serial.print(calibratedValues[0]);
+        Serial.print(" | Right edge: ");
+        Serial.println(calibratedValues[7]);
+        lastDebug = millis();
+    }
+
+    if (isAllBlack()) {
+        if (allBlackStartTime == 0) {
+            allBlackStartTime = millis();
+            Serial.println("On start square - moving forward to find line edge...");
+        }
+        setMotorSpeed(28, 28);
+        
+        bool leftEdgeWhite = (calibratedValues[0] < 200);
+        bool rightEdgeWhite = (calibratedValues[7] < 200);
+        bool centerSeesLine = (calibratedValues[3] > 400 || calibratedValues[4] > 400);
+
+        if (leftEdgeWhite || rightEdgeWhite || centerSeesLine) {
+            Serial.println("Start square exit detected!");
+            currentState = STATE_FOLLOWING;
+            resetPID();
+            digitalWrite(2, HIGH);
+            setMotorSpeed(0, 0);
+            delay(80);
+            Serial.println("STARTED! Beginning line follow.");
+        }
+    } else {
+        if (allBlackStartTime != 0) {
+            Serial.println("Lost start square - reposition robot");
+            allBlackStartTime = 0;
+        }
+        setMotorSpeed(0, 0);
+    }
+}
+
 void handleFollowing()
 {
     readSensors();
+
+    if (isAllBlack()) {
+        if (allBlackStartTime == 0) {
+            allBlackStartTime = millis();
+        }
+        else if (millis() - allBlackStartTime > 300) {
+            currentState = STATE_STOPPING;
+            stateStartTime = millis();
+            Serial.println("END DETECTED - Stopping");
+            return;
+        }
+        else if (millis() - allBlackStartTime > 80) {
+            currentState = STATE_INTERSECTION;
+            stateStartTime = millis();
+            Serial.println("INTERSECTION - Going straight");
+            return;
+        }
+        return;
+    }
+    allBlackStartTime = 0;
+
     float position = computePosition();
     updateMotorControl(position);
+}
+
+void handleIntersection()
+{
+    setMotorSpeed(baseSpeed, baseSpeed);
+    if (millis() - stateStartTime > 120) {
+        currentState = STATE_FOLLOWING;
+        resetPID();
+        allBlackStartTime = 0;
+    }
+}
+
+void handleStopping()
+{
+    setMotorSpeed(0, 0);
+    digitalWrite(2, LOW);
+    if (millis() - stateStartTime > 5000) {
+        currentState = STATE_IDLE;
+        allBlackStartTime = 0;
+        Serial.println("Ready for next run");
+    }
 }
 
 // ========== MAIN LOOP ==========
@@ -311,8 +462,17 @@ void loop()
         case STATE_CALIBRATING:
             handleCalibrating();
             break;
+        case STATE_STARTING:
+            handleStarting();
+            break;
         case STATE_FOLLOWING:
             handleFollowing();
+            break;
+        case STATE_INTERSECTION:
+            handleIntersection();
+            break;
+        case STATE_STOPPING:
+            handleStopping();
             break;
     }
 }
@@ -330,12 +490,17 @@ void onStartRequest()
     Serial.println(isCalibrated ? "YES" : "NO");
 
     if (isCalibrated && currentState == STATE_IDLE) {
-        currentState = STATE_FOLLOWING;
-        resetPID();
-        Serial.println("STARTED! Beginning line follow.");
+        currentState = STATE_STARTING;
+        allBlackStartTime = 0;
+        Serial.println("Entering STARTING state - waiting for start square");
+        Serial.println("Place robot on ALL BLACK square!");
     }
     else if (!isCalibrated) {
-        Serial.println("Cannot start - calibrate first!");
+        Serial.println("Cannot start - calibrate first! Press CALIBRATE button.");
+    }
+    else {
+        Serial.print("Cannot start - current state: ");
+        Serial.println(currentState);
     }
 }
 
