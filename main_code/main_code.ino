@@ -17,32 +17,40 @@ const int IN4 = 21;
 int sensorMin[NUM_SENSORS];
 int sensorMax[NUM_SENSORS];
 int calibratedValues[NUM_SENSORS];
-bool isCalibrated = false;
+bool isCalibrated         = false;
 bool calibrationRequested = false;
 
-float pidError      = 0;
-float lastError     = 0;
-float integral      = 0;
-float derivative    = 0;
+float pidError          = 0;
+float lastError         = 0;
+float integral          = 0;
+float derivative        = 0;
 float lastValidPosition = 3.5f;
-int   lastValidSide = 0;
+int   lastValidSide     = 0;
 
 float positionBuffer[3] = {3.5f, 3.5f, 3.5f};
-int   bufferIndex = 0;
+int   bufferIndex       = 0;
 
-bool lineLost = false;
+bool          lineLost     = false;
 unsigned long lineLostTime = 0;
-const unsigned long LINE_LOST_TIMEOUT = 150;
 
-const int  SPIN_START_SPEED = 22;
-const int  SPIN_RAMP_MS     = 80;
+const unsigned long LINE_LOST_TIMEOUT = 180;
+const unsigned long SPIN_CREEP_MS    = 35;
+const int           SPIN_CREEP_SPEED = 18;
+const int           SPIN_START_SPEED = 20;
+const int           SPIN_RAMP_MS    = 90;
 
-const unsigned long SPIN_CREEP_MS    = 40;
-const int           SPIN_CREEP_SPEED = 20;
+unsigned long lastEdgeSeenTime = 0;
+int           lastEdgeSide     = 0;
+const unsigned long EDGE_MEMORY_MS  = 200;
+const int           ARC_SPEED       = 22;
+const int           ARC_OUTER_BOOST = 7;
 
-bool lookaheadActive = false;
-const unsigned long LOOKAHEAD_DRIVE_MS = 80;
-const int           LOOKAHEAD_SPEED    = 28;
+const int EDGE_STRONG_THRESHOLD  = 400;
+const int CORNER_APPROACH_SPEED  = 28;
+
+const int           WIDE_LINE_THRESHOLD = 4;
+const unsigned long LOOKAHEAD_DRIVE_MS  = 60;
+const int           LOOKAHEAD_SPEED     = 22;
 
 enum RobotState {
     STATE_IDLE,
@@ -58,29 +66,30 @@ enum RobotState {
     STATE_STOPPING
 };
 
-RobotState currentState   = STATE_IDLE;
+RobotState    currentState      = STATE_IDLE;
 unsigned long stateStartTime    = 0;
 unsigned long allBlackStartTime = 0;
 
 WebServer server(80);
 
-void readSensors();
-void autoCalibrate();
+void  readSensors();
+void  autoCalibrate();
 float computePosition(bool &outLineLost);
-int getLineWidth();
-void updateMotorControl(float position);
-void setMotorSpeed(int leftSpeed, int rightSpeed);
-bool isAllBlack();
-bool edgeSpikeDetected();
-bool centerSeesLine();
+int   getLineWidth();
+void  updateMotorControl(float position);
+void  setMotorSpeed(int leftSpeed, int rightSpeed);
+bool  isAllBlack();
+bool  isWideLine();
+bool  centerSeesLine();
 float getLineCurvature();
-void resetPID();
-void emergencyStop();
+void  resetPID();
+void  emergencyStop();
+void  updateEdgeMemory();
 
 void setup()
 {
     Serial.begin(115200);
-    Serial.println("Robot booting...");
+    Serial.println("Robot booting — v5");
 
     for (int i = 0; i < NUM_SENSORS; i++) {
         pinMode(SENSOR_PINS[i], INPUT);
@@ -97,27 +106,23 @@ void setup()
     bleSetup();
 
     digitalWrite(2, HIGH); delay(500); digitalWrite(2, LOW);
-
-    Serial.println("Robot ready.");
-    Serial.println("Fixes: graduated spin, short L creep, broadened curve fake-turn detection.");
     Serial.println("Press CALIBRATE first!");
 }
 
 void autoCalibrate()
 {
-    Serial.println("=== CALIBRATION STARTED ===");
+    Serial.println("=== CALIBRATION STARTED (in-place spin) ===");
     digitalWrite(2, HIGH);
 
     for (int i = 0; i < NUM_SENSORS; i++) { sensorMin[i] = 4095; sensorMax[i] = 0; }
 
-    int leftSpeed = 22, rightSpeed = 42;
+    const int SPIN_CAL_SPEED = 32;
 
     for (int cycle = 0; cycle < 10; cycle++) {
         Serial.print("Cycle "); Serial.println(cycle + 1);
 
-        setMotorSpeed(leftSpeed, rightSpeed);
+        setMotorSpeed(SPIN_CAL_SPEED, -SPIN_CAL_SPEED);
         for (int t = 0; t < 90; t++) {
-            readSensors();
             for (int i = 0; i < NUM_SENSORS; i++) {
                 int val = analogRead(SENSOR_PINS[i]);
                 if (val < sensorMin[i]) sensorMin[i] = val;
@@ -126,9 +131,8 @@ void autoCalibrate()
             bleLoop(); ota_loop(server); delay(8);
         }
 
-        setMotorSpeed(rightSpeed, leftSpeed);
+        setMotorSpeed(-SPIN_CAL_SPEED, SPIN_CAL_SPEED);
         for (int t = 0; t < 90; t++) {
-            readSensors();
             for (int i = 0; i < NUM_SENSORS; i++) {
                 int val = analogRead(SENSOR_PINS[i]);
                 if (val < sensorMin[i]) sensorMin[i] = val;
@@ -145,28 +149,42 @@ void autoCalibrate()
 
     Serial.println("=== CALIBRATION COMPLETE ===");
     for (int i = 0; i < NUM_SENSORS; i++) {
-        Serial.print("S"); Serial.print(i); Serial.print(": ");
-        Serial.print(sensorMin[i]); Serial.print(" - "); Serial.println(sensorMax[i]);
+        Serial.print("S"); Serial.print(i);
+        Serial.print(": "); Serial.print(sensorMin[i]);
+        Serial.print(" - "); Serial.println(sensorMax[i]);
     }
 
     isCalibrated = true;
     digitalWrite(2, LOW);
-    Serial.println("Ready! Place robot on ALL BLACK square then press START.");
+    Serial.println("Ready! Place on ALL BLACK square then press START.");
 }
 
 void readSensors()
 {
     for (int i = 0; i < NUM_SENSORS; i++) {
         int raw = analogRead(SENSOR_PINS[i]);
-        calibratedValues[i] = constrain(map(raw, sensorMin[i], sensorMax[i], 0, 1000), 0, 1000);
+        calibratedValues[i] = constrain(
+            map(raw, sensorMin[i], sensorMax[i], 0, 1000), 0, 1000);
     }
 }
 
 int getLineWidth()
 {
     int w = 0;
-    for (int i = 0; i < NUM_SENSORS; i++) if (calibratedValues[i] > 200) w++;
+    for (int i = 0; i < NUM_SENSORS; i++) if (calibratedValues[i] > 250) w++;
     return w;
+}
+
+void updateEdgeMemory()
+{
+    if (calibratedValues[0] > 350) {
+        lastEdgeSeenTime = millis();
+        lastEdgeSide     = -1;
+    }
+    if (calibratedValues[7] > 350) {
+        lastEdgeSeenTime = millis();
+        lastEdgeSide     = 1;
+    }
 }
 
 float computePosition(bool &outLineLost)
@@ -209,22 +227,9 @@ bool isAllBlack()
     return (c >= 4);
 }
 
-bool edgeSpikeDetected()
+bool isWideLine()
 {
-    int leftCount  = 0, rightCount  = 0;
-    int centerCount = 0, totalActive = 0;
-
-    for (int i = 0; i < NUM_SENSORS; i++) if (calibratedValues[i] > 300) totalActive++;
-
-    for (int i = 0; i <= 2; i++) if (calibratedValues[i] > 350) leftCount++;
-    for (int i = 5; i <= 7; i++) if (calibratedValues[i] > 350) rightCount++;
-    for (int i = 2; i <= 5; i++) if (calibratedValues[i] > 250) centerCount++;
-
-    bool sideSpike    = (leftCount >= 2 || rightCount >= 2);
-    bool centerActive = (centerCount >= 1);
-    bool wideLine     = (totalActive >= 3);
-
-    return (sideSpike && centerActive && wideLine);
+    return (getLineWidth() >= WIDE_LINE_THRESHOLD);
 }
 
 bool centerSeesLine()
@@ -245,19 +250,40 @@ float getLineCurvature()
 
 void resetPID()
 {
-    integral = 0; derivative = 0; lastError = 0;
+    integral   = 0;
+    derivative = 0;
+    lastError  = 0;
+
+    for (int i = 0; i < 3; i++) positionBuffer[i] = lastValidPosition;
+    bufferIndex = 0;
+
+    lastEdgeSeenTime = 0;
 }
 
 void updateMotorControl(float position)
 {
     float error     = 3.5f - position;
     float deviation = abs(error);
+    int   lw        = getLineWidth();
 
-    int dynBase = constrain(baseSpeed + 8 - (int)(deviation * 18), 25, maxSpeed);
+    bool leftEdgeStrong  = (calibratedValues[0] >= EDGE_STRONG_THRESHOLD);
+    bool rightEdgeStrong = (calibratedValues[7] >= EDGE_STRONG_THRESHOLD);
+    bool narrowLine      = (lw <= 2);
 
-    int   lw = getLineWidth();
+    bool cornerApproach = narrowLine &&
+                          ((leftEdgeStrong  && lastValidSide <= 0) ||
+                           (rightEdgeStrong && lastValidSide >= 0));
+
+    int dynBase;
+    if (cornerApproach) {
+        dynBase  = CORNER_APPROACH_SPEED;
+        integral = 0;
+        Serial.println("Corner approach — speed capped, integral cleared");
+    } else {
+        dynBase = constrain(baseSpeed + 8 - (int)(deviation * 18), 25, maxSpeed);
+    }
+
     float wf = (lw >= 3) ? 0.9f : (lw <= 1) ? 1.2f : 1.0f;
-
     float cf = 1.0f + (abs(getLineCurvature()) / 500.0f);
     error = error * cf * wf;
 
@@ -290,7 +316,6 @@ void emergencyStop()
     currentState      = STATE_IDLE;
     lineLost          = false;
     lineLostTime      = 0;
-    lookaheadActive   = false;
     resetPID();
     allBlackStartTime = 0;
     digitalWrite(2, LOW);
@@ -301,7 +326,7 @@ void handleIdle()
 {
     setMotorSpeed(0, 0);
     if (calibrationRequested) {
-        currentState = STATE_CALIBRATING;
+        currentState         = STATE_CALIBRATING;
         calibrationRequested = false;
     }
 }
@@ -309,7 +334,7 @@ void handleIdle()
 void handleCalibrating()
 {
     autoCalibrate();
-    currentState = STATE_IDLE;
+    currentState         = STATE_IDLE;
     calibrationRequested = false;
 }
 
@@ -348,43 +373,50 @@ void handleStarting()
 void handleFollowing()
 {
     readSensors();
+    updateEdgeMemory();
 
     if (isAllBlack()) {
         if (allBlackStartTime == 0) allBlackStartTime = millis();
         if (millis() - allBlackStartTime > 300) {
-            currentState = STATE_STOPPING; stateStartTime = millis();
+            currentState   = STATE_STOPPING;
+            stateStartTime = millis();
             Serial.println("END"); return;
         }
         if (millis() - allBlackStartTime > 80) {
-            currentState = STATE_INTERSECTION; stateStartTime = millis();
+            currentState   = STATE_INTERSECTION;
+            stateStartTime = millis();
             Serial.println("INTERSECTION"); return;
         }
         return;
     }
     allBlackStartTime = 0;
 
-    if (edgeSpikeDetected()) {
-        Serial.println("Edge spike! Lookahead check...");
+    if (isWideLine()) {
+        Serial.print("Wide blob (");
+        Serial.print(getLineWidth());
+        Serial.println(" sensors) -> lookahead");
         currentState   = STATE_LOOKAHEAD;
         stateStartTime = millis();
         setMotorSpeed(LOOKAHEAD_SPEED, LOOKAHEAD_SPEED);
         return;
     }
 
-    bool lost = false;
+    bool  lost     = false;
     float position = computePosition(lost);
 
     if (lost) {
-        unsigned long now = millis();
+        unsigned long now     = millis();
+        unsigned long elapsed = now - lineLostTime;
 
         if (!lineLost) {
             lineLost     = true;
             lineLostTime = now;
-            Serial.print("Line lost - creep then spin ");
-            Serial.println(lastValidSide <= 0 ? "LEFT" : "RIGHT");
-        }
+            elapsed      = 0;
 
-        unsigned long elapsed = now - lineLostTime;
+            bool edgeRecent = (now - lastEdgeSeenTime) < EDGE_MEMORY_MS;
+            Serial.print("Line lost — ");
+            Serial.println(edgeRecent ? "ARC recovery" : "creep+spin recovery");
+        }
 
         if (elapsed > LINE_LOST_TIMEOUT) {
             setMotorSpeed(0, 0);
@@ -392,16 +424,24 @@ void handleFollowing()
             return;
         }
 
-        if (elapsed < SPIN_CREEP_MS) {
-            setMotorSpeed(SPIN_CREEP_SPEED, SPIN_CREEP_SPEED);
-        } else {
-            unsigned long spinElapsed = elapsed - SPIN_CREEP_MS;
-            float rampFraction = constrain((float)spinElapsed / SPIN_RAMP_MS, 0.0f, 1.0f);
-            int fullSpeed = baseSpeed + 10;
-            int sp = (int)(SPIN_START_SPEED + rampFraction * (fullSpeed - SPIN_START_SPEED));
+        bool edgeRecent = (millis() - lastEdgeSeenTime) < EDGE_MEMORY_MS;
 
-            if (lastValidSide <= 0) setMotorSpeed(-sp,  sp);
-            else                    setMotorSpeed( sp, -sp);
+        if (edgeRecent) {
+            if (lastEdgeSide < 0) {
+                setMotorSpeed(ARC_SPEED, ARC_SPEED + ARC_OUTER_BOOST);
+            } else {
+                setMotorSpeed(ARC_SPEED + ARC_OUTER_BOOST, ARC_SPEED);
+            }
+        } else {
+            if (elapsed < SPIN_CREEP_MS) {
+                setMotorSpeed(SPIN_CREEP_SPEED, SPIN_CREEP_SPEED);
+            } else {
+                float ramp = constrain(
+                    (float)(elapsed - SPIN_CREEP_MS) / SPIN_RAMP_MS, 0.0f, 1.0f);
+                int sp = (int)(SPIN_START_SPEED + ramp * ((baseSpeed + 10) - SPIN_START_SPEED));
+                if (lastValidSide <= 0) setMotorSpeed(-sp,  sp);
+                else                    setMotorSpeed( sp, -sp);
+            }
         }
         return;
     }
@@ -417,23 +457,24 @@ void handleFollowing()
 
 void handleLookahead()
 {
-    if (millis() - stateStartTime < LOOKAHEAD_DRIVE_MS) {
-        return;
-    }
+    if (millis() - stateStartTime < LOOKAHEAD_DRIVE_MS) return;
 
     readSensors();
+    int  w        = getLineWidth();
+    bool wideNow  = (w >= WIDE_LINE_THRESHOLD);
+    bool centerOk = centerSeesLine();
 
-    if (centerSeesLine()) {
-        Serial.println("LOOKAHEAD result: FAKE turn -> continue straight");
-        lookaheadActive = false;
-        currentState    = STATE_FOLLOWING;
+    if (wideNow || centerOk) {
+        Serial.print("LOOKAHEAD: FAKE (w=");
+        Serial.print(w); Serial.print(", c=");
+        Serial.print(centerOk); Serial.println(") -> follow");
+        currentState = STATE_FOLLOWING;
         resetPID();
     } else {
-        Serial.println("LOOKAHEAD result: REAL turn -> spin recovery");
-        lookaheadActive  = false;
-        lineLost         = true;
-        lineLostTime     = millis();
-        currentState     = STATE_FOLLOWING;
+        Serial.println("LOOKAHEAD: REAL turn -> spin recovery");
+        lineLost     = true;
+        lineLostTime = millis();
+        currentState = STATE_FOLLOWING;
     }
 }
 
@@ -441,7 +482,9 @@ void handleIntersection()
 {
     setMotorSpeed(baseSpeed, baseSpeed);
     if (millis() - stateStartTime > 120) {
-        currentState = STATE_FOLLOWING; allBlackStartTime = 0; resetPID();
+        currentState      = STATE_FOLLOWING;
+        allBlackStartTime = 0;
+        resetPID();
     }
 }
 
@@ -450,7 +493,8 @@ void handleStopping()
     setMotorSpeed(0, 0);
     digitalWrite(2, LOW);
     if (millis() - stateStartTime > 5000) {
-        currentState = STATE_IDLE; allBlackStartTime = 0;
+        currentState      = STATE_IDLE;
+        allBlackStartTime = 0;
         Serial.println("Ready for next run");
     }
 }
@@ -495,7 +539,8 @@ void onStartRequest()
 {
     Serial.print("START. Cal:"); Serial.println(isCalibrated ? "YES" : "NO");
     if (isCalibrated && currentState == STATE_IDLE) {
-        currentState = STATE_STARTING; allBlackStartTime = 0;
+        currentState      = STATE_STARTING;
+        allBlackStartTime = 0;
         Serial.println("STARTING - place on ALL BLACK square");
     } else if (!isCalibrated) {
         Serial.println("Calibrate first!");
