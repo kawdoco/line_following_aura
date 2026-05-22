@@ -306,7 +306,7 @@
     <div class="panel-title">// PID PARAMETERS</div>
     <div class="pid-row">
       <div class="pid-label"><span>P — PROPORTIONAL</span><span id="pVal">0.35</span></div>
-      <input type="range" id="pSlider" min="0" max="50" step="0.01" value="0.35" oninput="updateVal('p')" />
+      <input type="range" id="pSlider" min="0" max="200" step="0.01" value="0.35" oninput="updateVal('p')" />
     </div>
     <div class="pid-row">
       <div class="pid-label"><span>I — INTEGRAL</span><span id="iVal">0.000</span></div>
@@ -314,7 +314,7 @@
     </div>
     <div class="pid-row">
       <div class="pid-label"><span>D — DERIVATIVE</span><span id="dVal">0.12</span></div>
-      <input type="range" id="dSlider" min="0" max="50" step="0.01" value="0.12" oninput="updateVal('d')" />
+      <input type="range" id="dSlider" min="0" max="200" step="0.01" value="0.12" oninput="updateVal('d')" />
     </div>
     <div class="btn-row"><button id="sendBtn" onclick="sendPID()" disabled>&gt; SEND VALUES</button></div>
   </div>
