@@ -215,3 +215,20 @@ A **0.96" 128x64 OLED display** shows live system state and sensor feedback duri
 
 **Conclusion:** This combination provides reliable performance on 1.5cm line tracks with sharp 90° turns, fake branches, and intersections - all within ESP32 computational limits.
 
+---
+<details>
+<summary><b>Financial & Resource Management</b></summary>
+
+<br>
+
+The project was initially planned with a base budget of **LKR 16,000**, with an overall allowable budget of approximately **LKR 20,000** including a reserved emergency allocation for unexpected expenses, hardware replacements, and testing related risks.
+
+To maximize competitive performance, the team strategically invested more resources into critical performance related areas rather than distributing the budget evenly across all components. A **LiPo battery system** was selected for its superior discharge capability and responsiveness during high speed operation, while additional investment was made in a higher quality chassis to improve stability, balance, and tracking accuracy during fast line following.
+
+Due to stock limitations and component availability issues, several parts had to be sourced from alternative suppliers at higher market prices than originally estimated. During testing, the ESP32 board failed due to an issue with the integrated CP2102 serial communication interface, requiring the entire board to be replaced using the reserved emergency allocation.
+
+The **final total expenditure was LKR 18,951**, and all project costs were shared equally among team members.
+
+</details>
+
+---
