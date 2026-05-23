@@ -9,14 +9,13 @@ const int NUM_SENSORS = 8;
 const int ENA = 19;
 const int IN1 = 18;
 const int IN2 = 5;
-
 const int ENB = 23;
 const int IN3 = 22;
 const int IN4 = 21;
 
-int sensorMin[NUM_SENSORS];
-int sensorMax[NUM_SENSORS];
-int calibratedValues[NUM_SENSORS];
+int  sensorMin[NUM_SENSORS];
+int  sensorMax[NUM_SENSORS];
+int  calibratedValues[NUM_SENSORS];
 bool isCalibrated         = false;
 bool calibrationRequested = false;
 
@@ -34,10 +33,10 @@ bool          lineLost     = false;
 unsigned long lineLostTime = 0;
 
 const unsigned long LINE_LOST_TIMEOUT = 180;
-const unsigned long SPIN_CREEP_MS    = 35;
-const int           SPIN_CREEP_SPEED = 18;
-const int           SPIN_START_SPEED = 20;
-const int           SPIN_RAMP_MS    = 90;
+const unsigned long SPIN_CREEP_MS     = 35;
+const int           SPIN_CREEP_SPEED  = 18;
+const int           SPIN_START_SPEED  = 20;
+const int           SPIN_RAMP_MS      = 90;
 
 unsigned long lastEdgeSeenTime = 0;
 int           lastEdgeSide     = 0;
@@ -45,23 +44,26 @@ const unsigned long EDGE_MEMORY_MS  = 200;
 const int           ARC_SPEED       = 22;
 const int           ARC_OUTER_BOOST = 7;
 
-const int EDGE_STRONG_THRESHOLD  = 400;
-const int CORNER_APPROACH_SPEED  = 28;
+const int EDGE_STRONG_THRESHOLD = 400;
+const int CORNER_APPROACH_SPEED = 28;
 
-const int           WIDE_LINE_THRESHOLD = 4;
-const unsigned long LOOKAHEAD_DRIVE_MS  = 60;
-const int           LOOKAHEAD_SPEED     = 22;
+const int           SNAP_TURN_SPEED     = 28;
+const unsigned long SNAP_TURN_MAX_MS    = 400;
+const unsigned long SNAP_TURN_SETTLE_MS = 60;
+const int           FAKE_EDGE_THRESHOLD = 350;
+const int           LINE_FOUND_THRESH   = 300;
+
+int           snapTurnDirection = 0;
+unsigned long snapTurnStartTime = 0;
+unsigned long snapTurnDuration  = 0;
 
 enum RobotState {
     STATE_IDLE,
     STATE_CALIBRATING,
     STATE_STARTING,
     STATE_FOLLOWING,
-    STATE_LOOKAHEAD,
-    STATE_FAKE_BRANCH,
-    STATE_TURN_MODE,
-    STATE_STEP_RECOVERY,
-    STATE_SPIRAL_MODE,
+    STATE_SNAP_TURN,
+    STATE_UNDO_TURN,
     STATE_INTERSECTION,
     STATE_STOPPING
 };
@@ -79,7 +81,6 @@ int   getLineWidth();
 void  updateMotorControl(float position);
 void  setMotorSpeed(int leftSpeed, int rightSpeed);
 bool  isAllBlack();
-bool  isWideLine();
 bool  centerSeesLine();
 float getLineCurvature();
 void  resetPID();
@@ -89,7 +90,6 @@ void  updateEdgeMemory();
 void setup()
 {
     Serial.begin(115200);
-    Serial.println("Robot booting — v5");
 
     for (int i = 0; i < NUM_SENSORS; i++) {
         pinMode(SENSOR_PINS[i], INPUT);
@@ -100,18 +100,16 @@ void setup()
     pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
     pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
     pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
-    pinMode(2, OUTPUT);
+    pinMode(2,   OUTPUT);
 
     ota_begin(server);
     bleSetup();
 
     digitalWrite(2, HIGH); delay(500); digitalWrite(2, LOW);
-    Serial.println("Press CALIBRATE first!");
 }
 
 void autoCalibrate()
 {
-    Serial.println("=== CALIBRATION STARTED (in-place spin) ===");
     digitalWrite(2, HIGH);
 
     for (int i = 0; i < NUM_SENSORS; i++) { sensorMin[i] = 4095; sensorMax[i] = 0; }
@@ -119,8 +117,6 @@ void autoCalibrate()
     const int SPIN_CAL_SPEED = 32;
 
     for (int cycle = 0; cycle < 10; cycle++) {
-        Serial.print("Cycle "); Serial.println(cycle + 1);
-
         setMotorSpeed(SPIN_CAL_SPEED, -SPIN_CAL_SPEED);
         for (int t = 0; t < 90; t++) {
             for (int i = 0; i < NUM_SENSORS; i++) {
@@ -147,16 +143,8 @@ void autoCalibrate()
     for (int i = 0; i < NUM_SENSORS; i++)
         if (sensorMax[i] - sensorMin[i] < 100) sensorMax[i] = sensorMin[i] + 1000;
 
-    Serial.println("=== CALIBRATION COMPLETE ===");
-    for (int i = 0; i < NUM_SENSORS; i++) {
-        Serial.print("S"); Serial.print(i);
-        Serial.print(": "); Serial.print(sensorMin[i]);
-        Serial.print(" - "); Serial.println(sensorMax[i]);
-    }
-
     isCalibrated = true;
     digitalWrite(2, LOW);
-    Serial.println("Ready! Place on ALL BLACK square then press START.");
 }
 
 void readSensors()
@@ -177,14 +165,8 @@ int getLineWidth()
 
 void updateEdgeMemory()
 {
-    if (calibratedValues[0] > 350) {
-        lastEdgeSeenTime = millis();
-        lastEdgeSide     = -1;
-    }
-    if (calibratedValues[7] > 350) {
-        lastEdgeSeenTime = millis();
-        lastEdgeSide     = 1;
-    }
+    if (calibratedValues[0] > 350) { lastEdgeSeenTime = millis(); lastEdgeSide = -1; }
+    if (calibratedValues[7] > 350) { lastEdgeSeenTime = millis(); lastEdgeSide =  1; }
 }
 
 float computePosition(bool &outLineLost)
@@ -207,7 +189,7 @@ float computePosition(bool &outLineLost)
 
     if      (rawPos < 3.0f) lastValidSide = -1;
     else if (rawPos > 4.0f) lastValidSide =  1;
-    else                     lastValidSide =  0;
+    else                    lastValidSide =  0;
 
     positionBuffer[bufferIndex] = rawPos;
     bufferIndex = (bufferIndex + 1) % 3;
@@ -227,17 +209,12 @@ bool isAllBlack()
     return (c >= 4);
 }
 
-bool isWideLine()
-{
-    return (getLineWidth() >= WIDE_LINE_THRESHOLD);
-}
-
 bool centerSeesLine()
 {
-    return (calibratedValues[2] > 250 ||
-            calibratedValues[3] > 250 ||
-            calibratedValues[4] > 250 ||
-            calibratedValues[5] > 250);
+    return (calibratedValues[2] > LINE_FOUND_THRESH ||
+            calibratedValues[3] > LINE_FOUND_THRESH ||
+            calibratedValues[4] > LINE_FOUND_THRESH ||
+            calibratedValues[5] > LINE_FOUND_THRESH);
 }
 
 float getLineCurvature()
@@ -255,8 +232,7 @@ void resetPID()
     lastError  = 0;
 
     for (int i = 0; i < 3; i++) positionBuffer[i] = lastValidPosition;
-    bufferIndex = 0;
-
+    bufferIndex      = 0;
     lastEdgeSeenTime = 0;
 }
 
@@ -266,9 +242,9 @@ void updateMotorControl(float position)
     float deviation = abs(error);
     int   lw        = getLineWidth();
 
+    bool narrowLine      = (lw <= 2);
     bool leftEdgeStrong  = (calibratedValues[0] >= EDGE_STRONG_THRESHOLD);
     bool rightEdgeStrong = (calibratedValues[7] >= EDGE_STRONG_THRESHOLD);
-    bool narrowLine      = (lw <= 2);
 
     bool cornerApproach = narrowLine &&
                           ((leftEdgeStrong  && lastValidSide <= 0) ||
@@ -278,7 +254,6 @@ void updateMotorControl(float position)
     if (cornerApproach) {
         dynBase  = CORNER_APPROACH_SPEED;
         integral = 0;
-        Serial.println("Corner approach — speed capped, integral cleared");
     } else {
         dynBase = constrain(baseSpeed + 8 - (int)(deviation * 18), 25, maxSpeed);
     }
@@ -319,7 +294,6 @@ void emergencyStop()
     resetPID();
     allBlackStartTime = 0;
     digitalWrite(2, LOW);
-    Serial.println("!!! EMERGENCY STOP !!!");
 }
 
 void handleIdle()
@@ -342,16 +316,6 @@ void handleStarting()
 {
     readSensors();
 
-    static unsigned long lastDebug = 0;
-    if (millis() - lastDebug > 500) {
-        int bc = 0;
-        for (int i = 0; i < NUM_SENSORS; i++) if (calibratedValues[i] > 400) bc++;
-        Serial.print("Start black:"); Serial.print(bc);
-        Serial.print(" L:"); Serial.print(calibratedValues[0]);
-        Serial.print(" R:"); Serial.println(calibratedValues[7]);
-        lastDebug = millis();
-    }
-
     if (isAllBlack()) {
         if (allBlackStartTime == 0) allBlackStartTime = millis();
         setMotorSpeed(28, 28);
@@ -362,7 +326,6 @@ void handleStarting()
             digitalWrite(2, HIGH);
             setMotorSpeed(0, 0);
             delay(80);
-            Serial.println("STARTED!");
         }
     } else {
         allBlackStartTime = 0;
@@ -380,24 +343,29 @@ void handleFollowing()
         if (millis() - allBlackStartTime > 300) {
             currentState   = STATE_STOPPING;
             stateStartTime = millis();
-            Serial.println("END"); return;
+            return;
         }
         if (millis() - allBlackStartTime > 80) {
             currentState   = STATE_INTERSECTION;
             stateStartTime = millis();
-            Serial.println("INTERSECTION"); return;
+            return;
         }
         return;
     }
     allBlackStartTime = 0;
 
-    if (isWideLine()) {
-        Serial.print("Wide blob (");
-        Serial.print(getLineWidth());
-        Serial.println(" sensors) -> lookahead");
-        currentState   = STATE_LOOKAHEAD;
-        stateStartTime = millis();
-        setMotorSpeed(LOOKAHEAD_SPEED, LOOKAHEAD_SPEED);
+    bool leftEdgeFired  = (calibratedValues[0] > EDGE_STRONG_THRESHOLD);
+    bool rightEdgeFired = (calibratedValues[7] > EDGE_STRONG_THRESHOLD);
+    bool narrowLine     = (getLineWidth() <= 3);
+
+    if (narrowLine && (leftEdgeFired || rightEdgeFired)) {
+        if (leftEdgeFired && rightEdgeFired)
+            snapTurnDirection = (lastValidSide <= 0) ? -1 : 1;
+        else
+            snapTurnDirection = leftEdgeFired ? -1 : 1;
+
+        snapTurnStartTime = millis();
+        currentState      = STATE_SNAP_TURN;
         return;
     }
 
@@ -412,10 +380,6 @@ void handleFollowing()
             lineLost     = true;
             lineLostTime = now;
             elapsed      = 0;
-
-            bool edgeRecent = (now - lastEdgeSeenTime) < EDGE_MEMORY_MS;
-            Serial.print("Line lost — ");
-            Serial.println(edgeRecent ? "ARC recovery" : "creep+spin recovery");
         }
 
         if (elapsed > LINE_LOST_TIMEOUT) {
@@ -427,11 +391,8 @@ void handleFollowing()
         bool edgeRecent = (millis() - lastEdgeSeenTime) < EDGE_MEMORY_MS;
 
         if (edgeRecent) {
-            if (lastEdgeSide < 0) {
-                setMotorSpeed(ARC_SPEED, ARC_SPEED + ARC_OUTER_BOOST);
-            } else {
-                setMotorSpeed(ARC_SPEED + ARC_OUTER_BOOST, ARC_SPEED);
-            }
+            if (lastEdgeSide < 0) setMotorSpeed(ARC_SPEED, ARC_SPEED + ARC_OUTER_BOOST);
+            else                  setMotorSpeed(ARC_SPEED + ARC_OUTER_BOOST, ARC_SPEED);
         } else {
             if (elapsed < SPIN_CREEP_MS) {
                 setMotorSpeed(SPIN_CREEP_SPEED, SPIN_CREEP_SPEED);
@@ -449,32 +410,59 @@ void handleFollowing()
     if (lineLost) {
         lineLost = false;
         resetPID();
-        Serial.println("Line reacquired");
     }
 
     updateMotorControl(position);
 }
 
-void handleLookahead()
+void handleSnapTurn()
 {
-    if (millis() - stateStartTime < LOOKAHEAD_DRIVE_MS) return;
-
     readSensors();
-    int  w        = getLineWidth();
-    bool wideNow  = (w >= WIDE_LINE_THRESHOLD);
-    bool centerOk = centerSeesLine();
+    unsigned long elapsed = millis() - snapTurnStartTime;
 
-    if (wideNow || centerOk) {
-        Serial.print("LOOKAHEAD: FAKE (w=");
-        Serial.print(w); Serial.print(", c=");
-        Serial.print(centerOk); Serial.println(") -> follow");
-        currentState = STATE_FOLLOWING;
-        resetPID();
-    } else {
-        Serial.println("LOOKAHEAD: REAL turn -> spin recovery");
+    if (snapTurnDirection < 0) setMotorSpeed(-SNAP_TURN_SPEED,  SNAP_TURN_SPEED);
+    else                       setMotorSpeed( SNAP_TURN_SPEED, -SNAP_TURN_SPEED);
+
+    if (elapsed > SNAP_TURN_SETTLE_MS) {
+        bool oppositeSees = (snapTurnDirection < 0)
+                            ? (calibratedValues[7] > FAKE_EDGE_THRESHOLD)
+                            : (calibratedValues[0] > FAKE_EDGE_THRESHOLD);
+
+        if (oppositeSees) {
+            snapTurnDuration = elapsed;
+            currentState     = STATE_UNDO_TURN;
+            stateStartTime   = millis();
+            return;
+        }
+
+        if (centerSeesLine()) {
+            lineLost     = false;
+            currentState = STATE_FOLLOWING;
+            resetPID();
+            return;
+        }
+    }
+
+    if (elapsed > SNAP_TURN_MAX_MS) {
         lineLost     = true;
         lineLostTime = millis();
         currentState = STATE_FOLLOWING;
+        resetPID();
+    }
+}
+
+void handleUndoTurn()
+{
+    unsigned long elapsed = millis() - stateStartTime;
+
+    if (snapTurnDirection < 0) setMotorSpeed( SNAP_TURN_SPEED, -SNAP_TURN_SPEED);
+    else                       setMotorSpeed(-SNAP_TURN_SPEED,  SNAP_TURN_SPEED);
+
+    if (elapsed >= snapTurnDuration) {
+        setMotorSpeed(0, 0);
+        delay(30);
+        currentState = STATE_FOLLOWING;
+        resetPID();
     }
 }
 
@@ -495,14 +483,8 @@ void handleStopping()
     if (millis() - stateStartTime > 5000) {
         currentState      = STATE_IDLE;
         allBlackStartTime = 0;
-        Serial.println("Ready for next run");
     }
 }
-
-void handleFakeBranch()   { currentState = STATE_FOLLOWING; }
-void handleTightTurn()    { currentState = STATE_FOLLOWING; }
-void handleStepRecovery() { currentState = STATE_FOLLOWING; }
-void handleSpiralMode()   { currentState = STATE_FOLLOWING; }
 
 void loop()
 {
@@ -510,42 +492,24 @@ void loop()
     bleLoop();
 
     switch (currentState) {
-        case STATE_IDLE:          handleIdle();          break;
-        case STATE_CALIBRATING:   handleCalibrating();   break;
-        case STATE_STARTING:      handleStarting();      break;
-        case STATE_FOLLOWING:     handleFollowing();     break;
-        case STATE_LOOKAHEAD:     handleLookahead();     break;
-        case STATE_FAKE_BRANCH:   handleFakeBranch();    break;
-        case STATE_TURN_MODE:     handleTightTurn();     break;
-        case STATE_STEP_RECOVERY: handleStepRecovery();  break;
-        case STATE_SPIRAL_MODE:   handleSpiralMode();    break;
-        case STATE_INTERSECTION:  handleIntersection();  break;
-        case STATE_STOPPING:      handleStopping();      break;
-    }
-
-    static unsigned long lastDbg = 0;
-    if (millis() - lastDbg > 3000) {
-        Serial.print("State:"); Serial.print(currentState);
-        Serial.print(" Base:"); Serial.print(baseSpeed);
-        Serial.print(" Max:");  Serial.print(maxSpeed);
-        Serial.print(" Cal:");  Serial.println(isCalibrated);
-        lastDbg = millis();
+        case STATE_IDLE:         handleIdle();          break;
+        case STATE_CALIBRATING:  handleCalibrating();   break;
+        case STATE_STARTING:     handleStarting();      break;
+        case STATE_FOLLOWING:    handleFollowing();     break;
+        case STATE_SNAP_TURN:    handleSnapTurn();      break;
+        case STATE_UNDO_TURN:    handleUndoTurn();      break;
+        case STATE_INTERSECTION: handleIntersection();  break;
+        case STATE_STOPPING:     handleStopping();      break;
     }
 }
 
-void onCalibrateRequest() { calibrationRequested = true; Serial.println("Cal requested"); }
+void onCalibrateRequest() { calibrationRequested = true; }
 
 void onStartRequest()
 {
-    Serial.print("START. Cal:"); Serial.println(isCalibrated ? "YES" : "NO");
     if (isCalibrated && currentState == STATE_IDLE) {
         currentState      = STATE_STARTING;
         allBlackStartTime = 0;
-        Serial.println("STARTING - place on ALL BLACK square");
-    } else if (!isCalibrated) {
-        Serial.println("Calibrate first!");
-    } else {
-        Serial.print("Bad state: "); Serial.println(currentState);
     }
 }
 
@@ -555,5 +519,4 @@ void onSpeedUpdate(int newBaseSpeed, int newMaxSpeed)
 {
     baseSpeed = constrain(newBaseSpeed, 20, 100);
     maxSpeed  = constrain(newMaxSpeed,  40, 150);
-    Serial.printf("Speed: Base=%d Max=%d\n", baseSpeed, maxSpeed);
 }
