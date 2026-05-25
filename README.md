@@ -1,9 +1,11 @@
 # GIDEON 1.0 | Line Following Robot
 
-![Status](https://img.shields.io/badge/Status-In%20Development-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Arduino%20%7C%20ESP32-teal)
 ![Language](https://img.shields.io/badge/Language-C%2B%2B-blue)
 ![Competition](https://img.shields.io/badge/Competition-BCI%20Campus%20Negombo-red)
+![Place](https://img.shields.io/badge/Place-1st%20Overall-gold)
+![Year](https://img.shields.io/badge/Year-2026-lightgrey)
 
 **Team Aura** | BCI Campus, Negombo
 
@@ -11,11 +13,15 @@
 
 ## Overview
 
-GIDEON 1.0 is a line following robot built for the BCI Campus Negombo Line Following Robot Competition. This project is currently under active development.
+GIDEON 1.0 is a line following robot built for the BCI Campus Negombo Line Following Robot Competition 2026. The robot placed **1st Place**, making us the winning team of the competition. Core development is complete, though the project remains open for occasional improvements and experiments. The code is open for the community to learn from, build on, and experiment with. - WHILE(ALIVE) LEARN();
+
+![GROUP PHOTO](assets/GRPPHOTOS.jpg)
 
 ---
 
-## Team
+<details>
+<summary><b>Team</b></summary>
+<br>
 
 **Brian Fernandez** | Team Leader & Lead Software Developer -
 Responsible for core logic, PID integration, system architecture, and overall development.
@@ -30,32 +36,48 @@ Responsible for core logic, PID integration, system architecture, and overall de
 
 **Savinda** | Financial & Resource Management - Manages budget, resources, and component procurement.
 
----
-
-## Project Status
-
-Currently under active development and testing.
+</details>
 
 ---
 
-## Goals
+<details>
+<summary><b>Project Status</b></summary>
+<br>
+
+Development complete. The robot successfully competed and placed 1st at the BCI Campus Negombo Line Following Robot Competition 2026. The codebase is stable and no further core changes are planned. Occasional upgrades or experiments may be added over time..
+
+</details>
+
+---
+
+<details>
+<summary><b>Goals</b></summary>
+<br>
 
 - Accurate and fast line tracking
 - PID tuning for smooth performance
 - Stable wireless communication
 - Full system integration
 
+</details>
+
 ---
 
-## Competition
+<details>
+<summary><b>Competition</b></summary>
+<br>
 
 - **Event:** Line Following Robot Competition
 - **Venue:** BCI Campus, Negombo
 - **Robot:** GIDEON 1.0
 
+</details>
+
 ---
 
-## Hardware
+<details>
+<summary><b>Hardware</b></summary>
+<br>
 
 | Component | Details | Qty |
 |---|---|---|
@@ -67,163 +89,72 @@ Currently under active development and testing.
 | Castor Wheel | N20 Standard 15mm High Universal Wheel | 1 |
 | Motor Mounts | N20 Gear Motor Mount Bracket | 2 |
 | Buck Converter | Mini 360 DC 2A Step Down | 1 |
-| Buck Module | MP1584 4.5-28V to 0.8V-18V 3A Step Down | 2 |
+| Buck Module | MP1584 4.5-28V to 0.8V-18V 3A Step Down | 1 |
 | Battery | 7.4V 1500mAh 2S 95C LiPo XT60 Plug | 1 |
 | Display | 0.96 inch 128x64 OLED Blue I2C | 1 |
 | Switch | SPDT Toggle Switch 3-Pin (ON-OFF-ON) | 2 |
 
+</details>
+
 ---
 
-## GPIO Pin Configuration
+<details>
+<summary><b>GPIO Pin Configuration</b></summary>
+<br>
 
 ![ESP32 Pin Map](assets/GPIOlayout.svg)
 
----
-## ⚙️ Hardware Overview
-
-Power flows from the **7.4V 2S 95C LiPo battery** through two buck converters — the **MP1584** delivers a clean voltage rail for the ESP32 and sensors, and the **Mini 360** handles the motor driver logic separately. Two **SPDT switches** control power to the system.
-
-The **ESP32 DevKit V1** sits at the center of everything. It polls all eight **CNY70 reflective optical sensors**, runs the control algorithm, and fires PWM and direction signals to the **TB6612FNG motor driver**.
-
-The driver translates those low-current signals into the full current needed to spin two **N20 6V 540RPM geared motors** independently, steering the robot purely through the speed difference between the wheels. Each motor is mounted via an **N20 bracket** driving a **43mm rubber wheel**, with a front **15mm caster wheel** keeping the sensor array at a consistent height above the track.
-
-A **0.96" 128x64 OLED display** shows live system state and sensor feedback during tuning.
+</details>
 
 ---
-# Algorithm Research & Selection Report
----
+
 <details>
-<summary><b>📊 1. Position Detection Algorithms</b> (click to expand)</summary>
+<summary><b>Hardware Overview</b></summary>
+<br>
 
-### Researched Approaches:
-| Algorithm | Pros | Cons |
-|-----------|------|------|
-| **Binary threshold** | Simple, fast | Low resolution, poor curve detection |
-| **Weighted average** | Smooth 0-7 output | CPU intensive |
-| **Center of mass** | Handles varying line thickness | Needs good calibration |
-| **Edge detection** | Good for thick lines | Fails on curves |
+Power flows from the **7.4V 2S 95C LiPo battery** through buck converter — the **MP1584** delivers a clean voltage rail for the ESP32, motors and mini 360 buck converter. The **Mini 360** handles the power to the sensors and motor driver logic separately. Two **SPDT switches** control power to the system (one for the board one for the motors).
 
-### Selected: **Weighted Average with Intensity Scaling**
-**Why:** Best balance of accuracy and smoothness. Scales with line intensity to handle 1.5cm lines optimally.
+The **ESP32 DevKit V1** sits at the center of everything. It collects the readings from all the 8  **CNY70 reflective optical sensors**, runs the control algorithm, and fires PWM and direction signals to the **TB6612FNG motor driver**.
+
+The driver then controlls the **N20 6V 540RPM geared motors** according to the signals from esp32, steering the robot purely through the speed difference between the wheels. Each motor is mounted via an **N20 bracket** driving a **43mm rubber wheel**, with a front **15mm caster wheel** keeping the sensor array at a consistent height above the track.
+
+Development complete. The robot successfully competed and placed 1st at the BCI Campus Negombo Line Following Robot Competition 2026. The codebase is stable and no further core changes are planned. Occasional fun upgrades or experiments may be added over time.
 
 </details>
 
 ---
 
 <details>
-<summary><b>🎛️ 2. PID Control Algorithms</b> (click to expand)</summary>
+<summary><b>Algorithm Research & Selection</b></summary>
+<br>
 
-### Researched Approaches:
-| Algorithm | Best For | Complexity |
-|-----------|----------|------------|
-| **P-only** | Straight lines only | Low |
-| **PI** | Curved tracks | Medium |
-| **PID** | Sharp turns + curves | High |
-| **Fuzzy logic** | Research-grade | Very high |
-
-### Selected: **PID Control**
-**Why:** Industry standard for line following. Provides predictive control crucial for 90° turns while maintaining straight-line stability.
-
-**Tuned values:** P=0.35, I=0.00, D=0.12
-
-</details>
-
----
-
-<details>
-<summary><b>🔄 3. Turn Detection Algorithms</b> (click to expand)</summary>
-
-### Researched Approaches:
-| Algorithm | Accuracy | Complexity |
-|-----------|----------|------------|
-| **Static threshold** | 60% | Simple |
-| **Edge spike detection** | 85% | Medium |
-| **Lookahead with creep** | 95% | Complex |
-| **Machine learning** | 98% | Too heavy for ESP32 |
-
-### Selected: **Edge Spike Detection with 2-Frame Confirmation**
-**Why:** Detects when side sensors fire while center still sees line - the signature of an approaching branch. 2-frame confirmation prevents false triggers from sensor noise.
-
-</details>
-
----
-
-<details>
-<summary><b>🔄 4. Line Loss Recovery Algorithms</b> (click to expand)</summary>
-
-### Researched Approaches:
-| Algorithm | Recovery Time | Success Rate |
-|-----------|---------------|--------------|
-| **Stop and wait** | Unlimited | 0% |
-| **Forward creep** | 500-1000ms | 30% |
-| **Spin in place** | 300-600ms | 95% |
-| **Spiral search** | 800-1200ms | 98% |
-
-### Selected: **Spin in Place with Direction Memory**
-**Why:** Remembers last known side of the line. Spins toward that side with 600ms timeout. 95% success rate within 600ms.
-
-</details>
-
----
-
-<details>
-<summary><b>⚡ 5. Speed Adaptation Algorithms</b> (click to expand)</summary>
-
-### Researched Approaches:
-| Algorithm | Curve Handling | Computation |
-|-----------|---------------|-------------|
-| **Fixed speed** | Poor | None |
-| **Simple slowdown** | Medium | Low |
-| **Deviation-based** | Excellent | Medium |
-| **Predictive lookahead** | Excellent | High |
-
-### Selected: **Deviation-Based Adaptive Speed**
-**Why:** Speed = baseSpeed + 20 - (deviation × 18). Robot naturally slows down proportional to how far it is from center. Multiplier increased from 12→18 after testing showed robot entered turns too fast.
-
-</details>
-
----
-
-<details>
-<summary><b>📈 6. Filtering Algorithms</b> (click to expand)</summary>
-
-### Researched Approaches:
-| Filter | Smoothing | Delay |
-|--------|-----------|-------|
-| **None (raw)** | 0% | 0ms |
-| **3-sample moving average** | 65% | 24ms |
-| **5-sample moving average** | 75% | 40ms |
-| **Exponential** | 70% | Low |
-
-### Selected: **3-Sample Moving Average**
-**Why:** Best balance of noise reduction (65%) vs response delay (24ms). 5-sample was too sluggish for sharp turns.
-
-</details>
-
----
-
-<details open>
-<summary><b>📋 Summary Table</b> (click to collapse)</summary>
-
-| Component | Selected Algorithm | Key Advantage |
-|-----------|-------------------|----------------|
-| Position | Weighted average | Smooth 0-7 output |
-| Control | PID with adaptive speed | Predictive steering |
-| Turns | Edge spike detection | 95% accuracy |
-| Recovery | Spin with direction memory | 95% success within 600ms |
-| Filtering | 3-sample moving average | 65% noise reduction |
+| Component | Researched | Selected | Why |
+|-----------|-----------|----------|-----|
+| Position Detection | Binary threshold, Weighted average, Center of mass, Edge detection | Weighted Average with Intensity Scaling | Best balance of accuracy and smoothness for 1.5cm lines |
+| PID Control | P-only, PI, PID, Fuzzy logic | PID Control | Industry standard, handles sharp turns and curves reliably |
+| Turn Detection | Static threshold, Edge spike detection, Lookahead with creep, Machine learning | Edge Spike Detection with 2-Frame Confirmation | 95% accuracy without being too heavy for ESP32 |
+| Line Loss Recovery | Stop and wait, Forward creep, Spin in place, Spiral search | Spin in Place with Direction Memory | 95% success rate, fastest recovery using last known side |
+| Speed Adaptation | Fixed speed, Simple slowdown, Deviation-based, Predictive lookahead | Deviation-Based Adaptive Speed | Robot naturally slows on curves proportional to error |
+| Filtering | None, 3-sample average, 5-sample average, Exponential | 3-Sample Moving Average | Best noise reduction without slowing response on sharp turns |
 
 **Conclusion:** This combination provides reliable performance on 1.5cm line tracks with sharp 90° turns, fake branches, and intersections - all within ESP32 computational limits.
 
+</details>
+
 ---
-## PID Tuning Log
+
+<details>
+<summary><b>PID Tuning Log</b></summary>
+<br>
 
 ![PID Tuning Log](assets/pidTable.png)
 
+</details>
+
 ---
+
 <details>
 <summary><b>Financial & Resource Management</b></summary>
-
 <br>
 
 The project was initially planned with a base budget of **LKR 16,000**, with an overall allowable budget of approximately **LKR 20,000** including a reserved emergency allocation for unexpected expenses, hardware replacements, and testing related risks.
