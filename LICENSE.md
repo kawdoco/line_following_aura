@@ -1,7 +1,13 @@
 # License
 
-Copyright (c) 2025 Team Aura — BCI Campus, Negombo
+This project is open for personal, educational, and non-commercial use.
+Feel free to use, study, and modify the code.
 
-This project is private and restricted during the competition period. No part of this repository may be copied, modified, or distributed without explicit permission.
+Credit to the original author, Brian Fernandez and Team Aura — BCI Campus Negombo
+Line Following Robot Competition 2026 is appreciated but not required.
+All original rights remain with the author.
 
-This is an academic project developed solely for the BCI Campus Negombo Line Following Robot Competition and is not intended for commercial use.
+This project may not be sold, repackaged, or claimed as original work without
+explicit permission from the author.
+This was a competition project. The code is now open for the community to
+learn from. 
