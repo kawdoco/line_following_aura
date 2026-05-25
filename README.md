@@ -216,6 +216,11 @@ A **0.96" 128x64 OLED display** shows live system state and sensor feedback duri
 **Conclusion:** This combination provides reliable performance on 1.5cm line tracks with sharp 90° turns, fake branches, and intersections - all within ESP32 computational limits.
 
 ---
+## PID Tuning Log
+
+![PID Tuning Log](assets/pidTable.png)
+
+---
 <details>
 <summary><b>Financial & Resource Management</b></summary>
 
