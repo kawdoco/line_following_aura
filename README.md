@@ -23,18 +23,18 @@ GIDEON 1.0 is a line following robot built for the BCI Campus Negombo Line Follo
 <summary><b>Team</b></summary>
 <br>
 
-**Brian Fernandez** | Team Leader & Lead Software Developer -
+**Brian Fernandez** @brianmfdz| Team Leader & Lead Software Developer -
 Responsible for core logic, PID integration, system architecture, and overall development.
 
-**Sanjana & Kawye** | Handles the Connectivity & Communication between robot and control app, ensuring stable and reliable data transfer.
+**Sanjana & Kawye** @Prabashika-s @kawyekavishan12 | Handles the Connectivity & Communication between robot and control app, ensuring stable and reliable data transfer.
 
-**Diluksha** | PID Performance Logging and system performance analysis.
+**Diluksha** @dilukshefdo | PID Performance Logging and system performance analysis.
 
-**Dilmi & Uvindu** | Responsible for hardware selection and balanced integration.
+**Dilmi & Uvindu** @Dilmi100 @Uvindu-Sathsara | Responsible for hardware selection and balanced integration.
 
-**Navodya** | Technical Research & Innovation - Researches technologies and suggests improvements for system optimization.
+**Navodya** @navodya-sankalpani | Technical Research & Innovation - Researches technologies and suggests improvements for system optimization.
 
-**Savinda** | Financial & Resource Management - Manages budget, resources, and component procurement.
+**Savinda** @savindamahasingha | Financial & Resource Management - Manages budget, resources, and component procurement.
 
 </details>
 
@@ -76,12 +76,20 @@ Development complete. The robot successfully competed and placed 1st at the BCI 
 ---
 
 <details>
-<summary><b>Hardware</b></summary>
+<summary><b>Hardware Overview</b></summary>
+<br>
+
+Power flows from the **7.4V 2S 95C LiPo battery** through buck converter — the **MP1584** delivers a clean voltage rail for the ESP32, motors and mini 360 buck converter. The **Mini 360** handles the power to the sensors and motor driver logic separately. Two **SPDT switches** control power to the system (one for the board one for the motors).
+
+The **ESP32 DevKit V1** sits at the center of everything. It collects the readings from all the 8  **CNY70 reflective optical sensors**, runs the control algorithm, and fires PWM and direction signals to the **TB6612FNG motor driver**.
+
+The driver then controlls the **N20 6V 540RPM geared motors** according to the signals from esp32, steering the robot purely through the speed difference between the wheels. Each motor is mounted via an **N20 bracket** driving a **43mm rubber wheel**, with a front **15mm caster wheel** keeping the sensor array at a consistent height above the track.
+
 <br>
 
 | Component | Details | Qty |
 |---|---|---|
-| Microcontroller | NodeMCU ESP32 Dev Board Type-C 30-pin | 1 |
+| Microcontroller | ESP32 Dev module v1 30-pin | 1 |
 | Motor Driver | TB6612FNG Dual DC Stepper Motor Driver Module | 1 |
 | Motors | N20 540RPM 6VDC Metal Gear Motor 3mm Shaft | 2 |
 | Line Sensors | CNY70 Reflective Optical Sensor | 8 |
@@ -90,7 +98,7 @@ Development complete. The robot successfully competed and placed 1st at the BCI 
 | Motor Mounts | N20 Gear Motor Mount Bracket | 2 |
 | Buck Converter | Mini 360 DC 2A Step Down | 1 |
 | Buck Module | MP1584 4.5-28V to 0.8V-18V 3A Step Down | 1 |
-| Battery | 7.4V 1500mAh 2S 95C LiPo XT60 Plug | 1 |
+| Battery | 7.4V 1500mAh 2S 95C LiPo battery | 1 |
 | Display | 0.96 inch 128x64 OLED Blue I2C | 1 |
 | Switch | SPDT Toggle Switch 3-Pin (ON-OFF-ON) | 2 |
 
@@ -108,21 +116,6 @@ Development complete. The robot successfully competed and placed 1st at the BCI 
 
 ---
 
-<details>
-<summary><b>Hardware Overview</b></summary>
-<br>
-
-Power flows from the **7.4V 2S 95C LiPo battery** through buck converter — the **MP1584** delivers a clean voltage rail for the ESP32, motors and mini 360 buck converter. The **Mini 360** handles the power to the sensors and motor driver logic separately. Two **SPDT switches** control power to the system (one for the board one for the motors).
-
-The **ESP32 DevKit V1** sits at the center of everything. It collects the readings from all the 8  **CNY70 reflective optical sensors**, runs the control algorithm, and fires PWM and direction signals to the **TB6612FNG motor driver**.
-
-The driver then controlls the **N20 6V 540RPM geared motors** according to the signals from esp32, steering the robot purely through the speed difference between the wheels. Each motor is mounted via an **N20 bracket** driving a **43mm rubber wheel**, with a front **15mm caster wheel** keeping the sensor array at a consistent height above the track.
-
-Development complete. The robot successfully competed and placed 1st at the BCI Campus Negombo Line Following Robot Competition 2026. The codebase is stable and no further core changes are planned. Occasional fun upgrades or experiments may be added over time.
-
-</details>
-
----
 
 <details>
 <summary><b>Algorithm Research & Selection</b></summary>
@@ -132,7 +125,7 @@ Development complete. The robot successfully competed and placed 1st at the BCI 
 |-----------|-----------|----------|-----|
 | Position Detection | Binary threshold, Weighted average, Center of mass, Edge detection | Weighted Average with Intensity Scaling | Best balance of accuracy and smoothness for 1.5cm lines |
 | PID Control | P-only, PI, PID, Fuzzy logic | PID Control | Industry standard, handles sharp turns and curves reliably |
-| Turn Detection | Static threshold, Edge spike detection, Lookahead with creep, Machine learning | Edge Spike Detection with 2-Frame Confirmation | 95% accuracy without being too heavy for ESP32 |
+| Turn Detection | Static threshold, Edge spike detection, Lookahead with creep, Machine learning | Edge Spike + look ahead Detection with 2-Frame Confirmation | 95% accuracy without being too heavy for ESP32 |
 | Line Loss Recovery | Stop and wait, Forward creep, Spin in place, Spiral search | Spin in Place with Direction Memory | 95% success rate, fastest recovery using last known side |
 | Speed Adaptation | Fixed speed, Simple slowdown, Deviation-based, Predictive lookahead | Deviation-Based Adaptive Speed | Robot naturally slows on curves proportional to error |
 | Filtering | None, 3-sample average, 5-sample average, Exponential | 3-Sample Moving Average | Best noise reduction without slowing response on sharp turns |
