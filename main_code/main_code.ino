@@ -3,6 +3,9 @@
 #include "ble_pid.h"
 #include "ota.h"
 
+#include <Adafruit_SSD1306.h>
+#include <FluxGarage_RoboEyes.h>
+
 // ========== PIN CONFIGURATION ==========
 const int SENSOR_PINS[] = {27, 26, 25, 33, 32, 35, 39, 36};
 const int NUM_SENSORS = 8;
@@ -14,6 +17,13 @@ const int IN2 = 5;
 const int ENB = 23;
 const int IN3 = 22;
 const int IN4 = 21;
+
+// ========== oled display ==========
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define OLED_RESET     -1 // Reset pin #
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+RoboEyes<Adafruit_SSD1306> roboEyes(display); 
 
 // ========== SENSOR CALIBRATION ==========
 int sensorMin[NUM_SENSORS];
@@ -46,6 +56,9 @@ const int           SPIN_CREEP_SPEED = 20;
 bool lookaheadActive = false;
 const unsigned long LOOKAHEAD_DRIVE_MS = 80;
 const int           LOOKAHEAD_SPEED    = 28;
+
+// ========== EMERGENCY STOP TIMER ==========
+unsigned long emergencyStopTime = 0; // FIX 3: non-blocking timer
 
 // ========== ROBOT STATE MACHINE ==========
 enum RobotState {
@@ -87,6 +100,18 @@ void setup()
 {
     Serial.begin(115200);
     Serial.println("Robot booting...");
+    Wire.begin(14, 13); // SDA = D12, SCL = D13
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 100);
+
+    roboEyes.setAutoblinker(ON, 3, 2);
+    roboEyes.setIdleMode(ON, 2, 2);
+
+    roboEyes.setWidth(36, 36);
+    roboEyes.setHeight(36, 36);
+    roboEyes.setBorderradius(8, 8);
+    roboEyes.setSpacebetween(10);
+    roboEyes.setMood(DEFAULT);
 
     for (int i = 0; i < NUM_SENSORS; i++) {
         pinMode(SENSOR_PINS[i], INPUT);
@@ -112,6 +137,8 @@ void autoCalibrate()
 {
     Serial.println("=== CALIBRATION STARTED (in-place spin) ===");
     digitalWrite(2, HIGH);
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setCuriosity(ON);
 
     for (int i = 0; i < NUM_SENSORS; i++) { sensorMin[i] = 4095; sensorMax[i] = 0; }
 
@@ -127,7 +154,7 @@ void autoCalibrate()
                 if (val < sensorMin[i]) sensorMin[i] = val;
                 if (val > sensorMax[i]) sensorMax[i] = val;
             }
-            bleLoop(); ota_loop(server); delay(8);
+            bleLoop(); ota_loop(server); roboEyes.update(); delay(8); // FIX 2: added roboEyes.update()
         }
 
         setMotorSpeed(-SPIN_CAL_SPEED, SPIN_CAL_SPEED);
@@ -137,7 +164,7 @@ void autoCalibrate()
                 if (val < sensorMin[i]) sensorMin[i] = val;
                 if (val > sensorMax[i]) sensorMax[i] = val;
             }
-            bleLoop(); ota_loop(server); delay(8);
+            bleLoop(); ota_loop(server); roboEyes.update(); delay(8); // FIX 2: added roboEyes.update()
         }
     }
 
@@ -302,12 +329,22 @@ void emergencyStop()
     allBlackStartTime = 0;
     digitalWrite(2, LOW);
     Serial.println("!!! EMERGENCY STOP !!!");
+    roboEyes.setMood(TIRED);
+    roboEyes.setCuriosity(OFF);
+    emergencyStopTime = millis(); // FIX 3: record time, no blocking delay
 }
 
 // ========== STATE HANDLERS ==========
 void handleIdle()
 {
     setMotorSpeed(0, 0);
+
+    // FIX 3: non-blocking 10 second timer to restore eyes after emergency stop
+    if (emergencyStopTime > 0 && millis() - emergencyStopTime > 10000) {
+        roboEyes.setMood(DEFAULT);
+        emergencyStopTime = 0;
+    }
+
     if (calibrationRequested) {
         currentState = STATE_CALIBRATING;
         calibrationRequested = false;
@@ -351,6 +388,8 @@ void handleStarting()
         allBlackStartTime = 0;
         setMotorSpeed(0, 0);
     }
+    roboEyes.setCuriosity(OFF);
+    roboEyes.setMood(ANGRY); // FIX 1: was setPosition(ANGRY)
 }
 
 void handleFollowing()
@@ -473,6 +512,7 @@ void loop()
 {
     ota_loop(server);
     bleLoop();
+    roboEyes.update();
 
     switch (currentState) {
         case STATE_IDLE:          handleIdle();          break;
